@@ -279,6 +279,12 @@
   .bh-label{ color:var(--text-soft); }
   .bh-amount.plus{ color:var(--green); font-weight:700; }
   .bh-amount.minus{ color:var(--red); font-weight:700; }
+  .bh-edit-btn, .bh-del-btn{
+    background:none; border:none; cursor:pointer; font-size:11px;
+    padding:2px 4px; color:var(--text-soft); line-height:1;
+  }
+  .bh-edit-btn:hover{ color:var(--green); }
+  .bh-del-btn:hover{ color:var(--red); }
 
   @media(max-width:640px){
     .stats-bar{ grid-template-columns:1fr 1fr; }
@@ -439,10 +445,6 @@
           <input type="number" id="fTake" placeholder="0.00" step="any">
         </div>
         <div class="field">
-          <label>Цена выхода</label>
-          <input type="number" id="fExit" placeholder="0.00" step="any">
-        </div>
-        <div class="field">
           <label>Плечо (×)</label>
           <input type="number" id="fLeverage" placeholder="10" min="1">
         </div>
@@ -451,8 +453,16 @@
           <input type="number" id="fSizePct" placeholder="5" step="any" min="0" max="100">
         </div>
         <div class="field">
+          <label>Цена выхода</label>
+          <input type="number" id="fExit" placeholder="0.00" step="any">
+        </div>
+        <div class="field">
           <label>P&L (USDT)</label>
           <input type="number" id="fPnl" placeholder="+25.00" step="any">
+        </div>
+        <div class="field">
+          <label>Издержки (комиссии + фандинг)</label>
+          <input type="number" id="fCosts" placeholder="0.00" step="any" min="0">
         </div>
         <div class="field full" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;">
           <span style="font-size:12px;color:var(--text-soft)">Размер позиции (депозит × % × плечо)</span>
@@ -481,34 +491,22 @@
         <textarea id="fNotes" placeholder="Что сделал правильно, что нет, что учесть в следующий раз…"></textarea>
       </div>
       <div class="field">
-        <label>Скриншоты графика (до 2-х)</label>
+        <label>Скриншоты графика (до 4-х)</label>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div class="upload-slot" id="uploadSlot0">
-            <input type="file" id="fScreenshot0" accept="image/*" style="display:none">
-            <div class="upload-area" id="uploadArea0">
-              <div class="upload-placeholder" id="uploadPlaceholder0">
+          ${[0,1,2,3].map(i=>`
+          <div class="upload-slot" id="uploadSlot${i}">
+            <input type="file" id="fScreenshot${i}" accept="image/*" style="display:none">
+            <div class="upload-area" id="uploadArea${i}">
+              <div class="upload-placeholder" id="uploadPlaceholder${i}">
                 <div style="font-size:20px;margin-bottom:4px">📷</div>
-                <div style="font-size:12px;color:var(--text-soft)">Скриншот 1</div>
+                <div style="font-size:12px;color:var(--text-soft)">Скриншот ${i+1}</div>
               </div>
-              <div class="upload-preview-wrap" id="uploadPreviewWrap0" style="display:none;position:relative;">
-                <img id="uploadPreview0" style="max-width:100%;border-radius:6px;">
-                <button class="upload-del-btn" id="uploadDel0" title="Удалить">✕</button>
+              <div class="upload-preview-wrap" id="uploadPreviewWrap${i}" style="display:none;position:relative;">
+                <img id="uploadPreview${i}" style="max-width:100%;border-radius:6px;">
+                <button class="upload-del-btn" id="uploadDel${i}" title="Удалить">✕</button>
               </div>
             </div>
-          </div>
-          <div class="upload-slot" id="uploadSlot1">
-            <input type="file" id="fScreenshot1" accept="image/*" style="display:none">
-            <div class="upload-area" id="uploadArea1">
-              <div class="upload-placeholder" id="uploadPlaceholder1">
-                <div style="font-size:20px;margin-bottom:4px">📷</div>
-                <div style="font-size:12px;color:var(--text-soft)">Скриншот 2</div>
-              </div>
-              <div class="upload-preview-wrap" id="uploadPreviewWrap1" style="display:none;position:relative;">
-                <img id="uploadPreview1" style="max-width:100%;border-radius:6px;">
-                <button class="upload-del-btn" id="uploadDel1" title="Удалить">✕</button>
-              </div>
-            </div>
-          </div>
+          </div>`).join('')}
         </div>
         <div id="uploadStatus" style="font-size:12px;color:var(--text-soft);margin-top:6px;"></div>
       </div>
@@ -595,13 +593,14 @@ function setStatus(msg, ok){
 function renderStats(){
   const t = trades;
   document.getElementById('statTotal').textContent = t.length || '0';
-  const pnl = t.reduce((s,x)=> s + (parseFloat(x.pnl)||0), 0);
+  const netPnl = x => (parseFloat(x.pnl)||0) - (parseFloat(x.costs)||0);
+  const pnl = t.reduce((s,x)=> s + netPnl(x), 0);
   const pnlEl = document.getElementById('statPnl');
   pnlEl.textContent = (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + ' $';
   pnlEl.className = 'stat-value ' + (pnl > 0 ? 'green' : pnl < 0 ? 'red' : '');
-  const wins = t.filter(x => parseFloat(x.pnl) > 0).length;
+  const wins = t.filter(x => netPnl(x) > 0).length;
   document.getElementById('statWinrate').textContent = t.length ? Math.round(wins/t.length*100) + '%' : '—';
-  const avg = t.length ? (t.reduce((s,x)=>s+(parseFloat(x.pnl)||0),0) / t.length) : null;
+  const avg = t.length ? (t.reduce((s,x)=>s+netPnl(x),0) / t.length) : null;
   const avgEl = document.getElementById('statAvg');
   avgEl.textContent = avg !== null ? (avg >= 0 ? '+' : '') + avg.toFixed(2) + ' $' : '—';
   avgEl.className = 'stat-value ' + (avg > 0 ? 'green' : avg < 0 ? 'red' : '');
@@ -613,9 +612,10 @@ function getFiltered(){
   const res = document.getElementById('filterResult').value;
   return trades.filter(t=>{
     if(dir && t.direction !== dir) return false;
-    if(res === 'win' && !(parseFloat(t.pnl) > 0)) return false;
-    if(res === 'loss' && !(parseFloat(t.pnl) < 0)) return false;
-    if(res === 'be' && parseFloat(t.pnl) !== 0) return false;
+    const net = (parseFloat(t.pnl)||0) - (parseFloat(t.costs)||0);
+    if(res === 'win' && !(net > 0)) return false;
+    if(res === 'loss' && !(net < 0)) return false;
+    if(res === 'be' && net !== 0) return false;
     return true;
   });
 }
@@ -628,7 +628,7 @@ function renderTable(){
   body.innerHTML = '';
   filtered.forEach((t, i)=>{
     const realIdx = trades.indexOf(t);
-    const pnl = parseFloat(t.pnl) || 0;
+    const pnl = (parseFloat(t.pnl)||0) - (parseFloat(t.costs)||0);
     const pnlClass = pnl > 0 ? 'pos' : pnl < 0 ? 'neg' : 'zero';
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -681,6 +681,7 @@ function showDetail(idx){
     ['Плечо', t.leverage ? '×' + t.leverage : '—'],
     ['% от депозита', t.sizePct ? t.sizePct + '%' : '—'],
     ['Размер позиции', t.size ? t.size + ' USDT' : '—'],
+    ['Издержки', t.costs ? '−' + parseFloat(t.costs).toFixed(2) + ' $' : '—'],
     ['P&L', `<span class="pnl ${pnl>0?'pos':pnl<0?'neg':'zero'}">${pnl>=0?'+':''}${pnl.toFixed(2)} $</span>`],
     ['Эмоции', t.emotion || '—'],
   ];
@@ -728,6 +729,7 @@ function openEdit(idx){
   document.getElementById('fLeverage').value = t.leverage || '';
 
   document.getElementById('fPnl').value = t.pnl || '';
+  document.getElementById('fCosts').value = t.costs || '';
   document.getElementById('fReason').value = t.reason || '';
   document.getElementById('fNotes').value = t.notes || '';
   document.getElementById('fSizePct').value = t.sizePct || '';
@@ -738,7 +740,7 @@ function openEdit(idx){
   // load existing screenshots
   resetUpload();
   (t.screenshots || []).forEach((src, i)=>{
-    if(i > 1 || !src) return;
+    if(i > 3 || !src) return;
     screenshots[i] = src;
     document.getElementById(`uploadPreview${i}`).src = src;
     document.getElementById(`uploadPreviewWrap${i}`).style.display = 'block';
@@ -750,7 +752,7 @@ function openEdit(idx){
 }
 
 function clearForm(){
-  ['fCoin','fDateIn','fDateOut','fEntry','fStop','fTake','fExit','fLeverage','fSizePct','fPnl','fReason','fNotes']
+  ['fCoin','fDateIn','fDateOut','fEntry','fStop','fTake','fExit','fLeverage','fSizePct','fPnl','fCosts','fReason','fNotes']
     .forEach(id=>{ document.getElementById(id).value=''; });
   document.getElementById('fSizeCalc').textContent = '— USDT';
   document.getElementById('fDir').value = 'LONG';
@@ -802,6 +804,7 @@ document.getElementById('modalSave').addEventListener('click', async ()=>{
     leverage:  document.getElementById('fLeverage').value,
     size:      (()=>{ const p=parseFloat(document.getElementById('fSizePct').value)||0; const l=parseFloat(document.getElementById('fLeverage').value)||0; const b=calcBalance(); return (p>0&&l>0&&b>0)?(b*p/100*l).toFixed(2):''; })(),
     pnl:       document.getElementById('fPnl').value,
+    costs:     document.getElementById('fCosts').value,
     reason:    document.getElementById('fReason').value.trim(),
     emotion:   selectedEmotions.join(', '),
     notes:     document.getElementById('fNotes').value.trim(),
@@ -834,10 +837,10 @@ document.getElementById('filterResult').addEventListener('change', renderTable);
 
 
 // --- Screenshot upload (2 slots) ---
-let screenshots = ['', ''];
+let screenshots = ['', '', '', ''];
 
 function initUpload(){
-  [0, 1].forEach(i => {
+  [0, 1, 2, 3].forEach(i => {
     const area = document.getElementById(`uploadArea${i}`);
     const input = document.getElementById(`fScreenshot${i}`);
     const delBtn = document.getElementById(`uploadDel${i}`);
@@ -903,8 +906,8 @@ function deleteScreenshot(idx){
 
 
 function resetUpload(){
-  screenshots = ['', ''];
-  [0,1].forEach(i=>{
+  screenshots = ['', '', '', ''];
+  [0,1,2,3].forEach(i=>{
     document.getElementById(`uploadPreview${i}`).src = '';
     document.getElementById(`uploadPreviewWrap${i}`).style.display = 'none';
     document.getElementById(`uploadPlaceholder${i}`).style.display = 'block';
@@ -933,7 +936,7 @@ function updateSizeCalc(){
 let balanceOps = []; // [{type, amount, comment, date}]
 
 function calcBalance(){
-  const tradePnl = trades.reduce((s,t)=> s + (parseFloat(t.pnl)||0), 0);
+  const tradePnl = trades.reduce((s,t)=> s + (parseFloat(t.pnl)||0) - (parseFloat(t.costs)||0), 0);
   const opsTotal = balanceOps.reduce((s,op)=>{
     const a = parseFloat(op.amount)||0;
     return s + (op.type === 'withdraw' ? -a : a);
@@ -949,19 +952,51 @@ function renderBalance(){
 
   const hist = document.getElementById('balanceHistory');
   if(!balanceOps.length){ hist.innerHTML = ''; return; }
-  hist.innerHTML = '<div style="font-size:10px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">История операций</div>' +
-    [...balanceOps].reverse().map(op=>{
-      const a = parseFloat(op.amount)||0;
-      const isPlus = op.type !== 'withdraw';
-      const label = op.type === 'deposit' ? 'Пополнение' : op.type === 'withdraw' ? 'Вывод' : 'Депозит';
-      return `<div class="balance-history-item">
-        <div>
-          <div class="bh-label">${label}${op.comment ? ' · ' + op.comment : ''}</div>
-          <div style="font-size:10px;color:var(--text-muted)">${op.date||''}</div>
-        </div>
-        <div class="bh-amount ${isPlus?'plus':'minus'}">${isPlus?'+':'-'}${a.toFixed(2)} $</div>
-      </div>`;
-    }).join('');
+  hist.innerHTML = '<div style="font-size:10px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">История операций</div>';
+
+  [...balanceOps].reverse().forEach((op, revIdx)=>{
+    const realIdx = balanceOps.length - 1 - revIdx;
+    const a = parseFloat(op.amount)||0;
+    const isPlus = op.type !== 'withdraw';
+    const label = op.type === 'deposit' ? 'Пополнение' : op.type === 'withdraw' ? 'Вывод' : 'Депозит';
+
+    const item = document.createElement('div');
+    item.className = 'balance-history-item';
+    item.style.alignItems = 'center';
+    item.innerHTML = `
+      <div style="flex:1">
+        <div class="bh-label">${label}${op.comment ? ' · ' + op.comment : ''}</div>
+        <div style="font-size:10px;color:var(--text-muted)">${op.date||''}</div>
+      </div>
+      <div class="bh-amount ${isPlus?'plus':'minus'}" style="margin-right:8px">${isPlus?'+':'-'}${a.toFixed(2)} $</div>
+      <button class="bh-edit-btn" data-idx="${realIdx}" title="Редактировать">✏</button>
+      <button class="bh-del-btn" data-idx="${realIdx}" title="Удалить">✕</button>
+    `;
+    hist.appendChild(item);
+  });
+
+  // edit buttons
+  hist.querySelectorAll('.bh-edit-btn').forEach(btn=>{
+    btn.addEventListener('click', e=>{ e.stopPropagation(); editBalanceOp(parseInt(btn.dataset.idx)); });
+  });
+  hist.querySelectorAll('.bh-del-btn').forEach(btn=>{
+    btn.addEventListener('click', async e=>{
+      e.stopPropagation();
+      balanceOps.splice(parseInt(btn.dataset.idx), 1);
+      renderBalance(); await saveBalance();
+    });
+  });
+}
+
+function editBalanceOp(idx){
+  const op = balanceOps[idx];
+  document.getElementById('bType').value = op.type;
+  document.getElementById('bAmount').value = op.amount;
+  document.getElementById('bComment').value = op.comment || '';
+  // change save button to update
+  const btn = document.getElementById('bSaveBtn');
+  btn.textContent = 'Обновить';
+  btn.dataset.editIdx = idx;
 }
 
 // dropdown toggle
@@ -978,12 +1013,21 @@ document.addEventListener('click', e=>{
 document.getElementById('bSaveBtn').addEventListener('click', async ()=>{
   const amount = parseFloat(document.getElementById('bAmount').value);
   if(!amount || amount <= 0){ alert('Укажи сумму'); return; }
-  balanceOps.push({
+  const btn = document.getElementById('bSaveBtn');
+  const editIdx = btn.dataset.editIdx;
+  const op = {
     type: document.getElementById('bType').value,
     amount,
     comment: document.getElementById('bComment').value.trim(),
-    date: new Date().toLocaleDateString('ru-RU')
-  });
+    date: editIdx !== undefined ? balanceOps[editIdx].date : new Date().toLocaleDateString('ru-RU')
+  };
+  if(editIdx !== undefined){
+    balanceOps[parseInt(editIdx)] = op;
+    delete btn.dataset.editIdx;
+    btn.textContent = 'Применить';
+  } else {
+    balanceOps.push(op);
+  }
   document.getElementById('bAmount').value = '';
   document.getElementById('bComment').value = '';
   renderBalance();
