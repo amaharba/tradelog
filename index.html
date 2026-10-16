@@ -335,9 +335,15 @@
       <input type="number" id="bAmount" placeholder="0.00" step="any" style="font-family:inherit;font-size:13px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:9px 12px;width:100%">
     </div>
   </div>
-  <div class="field" style="margin-bottom:10px;">
-    <label>Комментарий</label>
-    <input type="text" id="bComment" placeholder="Необязательно…" style="font-family:inherit;font-size:13px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:9px 12px;width:100%">
+  <div class="field-group" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+    <div class="field">
+      <label>Дата</label>
+      <input type="date" id="bDate" style="font-family:inherit;font-size:13px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:9px 12px;width:100%">
+    </div>
+    <div class="field">
+      <label>Комментарий</label>
+      <input type="text" id="bComment" placeholder="Необязательно…" style="font-family:inherit;font-size:13px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:9px 12px;width:100%">
+    </div>
   </div>
   <button class="btn btn-primary" id="bSaveBtn" style="width:100%">Применить</button>
   <div class="balance-history" id="balanceHistory"></div>
@@ -1031,6 +1037,7 @@ function editBalanceOp(idx){
   document.getElementById('bType').value = op.type;
   document.getElementById('bAmount').value = op.amount;
   document.getElementById('bComment').value = op.comment || '';
+  document.getElementById('bDate').value = op.dateISO || '';
   // change save button to update
   const btn = document.getElementById('bSaveBtn');
   btn.textContent = 'Обновить';
@@ -1042,6 +1049,8 @@ const dropdown = document.getElementById('balanceDropdown');
 document.getElementById('balanceMenuBtn').addEventListener('click', e=>{
   e.stopPropagation();
   dropdown.classList.toggle('open');
+  if(!document.getElementById('bDate').value)
+    document.getElementById('bDate').value = new Date().toISOString().split('T')[0];
 });
 document.addEventListener('click', e=>{
   if(!dropdown.contains(e.target) && e.target !== document.getElementById('balanceMenuBtn'))
@@ -1053,11 +1062,14 @@ document.getElementById('bSaveBtn').addEventListener('click', async ()=>{
   if(!amount || amount <= 0){ alert('Укажи сумму'); return; }
   const btn = document.getElementById('bSaveBtn');
   const editIdx = btn.dataset.editIdx;
+  const dateISO = document.getElementById('bDate').value || new Date().toISOString().split('T')[0];
+  const dateDisplay = new Date(dateISO).toLocaleDateString('ru-RU');
   const op = {
     type: document.getElementById('bType').value,
     amount,
     comment: document.getElementById('bComment').value.trim(),
-    date: editIdx !== undefined ? balanceOps[editIdx].date : new Date().toLocaleDateString('ru-RU')
+    dateISO,
+    date: dateDisplay
   };
   if(editIdx !== undefined){
     balanceOps[parseInt(editIdx)] = op;
@@ -1068,6 +1080,7 @@ document.getElementById('bSaveBtn').addEventListener('click', async ()=>{
   }
   document.getElementById('bAmount').value = '';
   document.getElementById('bComment').value = '';
+  document.getElementById('bDate').value = new Date().toISOString().split('T')[0];
   renderBalance();
   await saveBalance();
 });
