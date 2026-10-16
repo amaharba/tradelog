@@ -532,21 +532,39 @@
 </div>
 
 <script>
-const GAS_URL  = 'https://script.google.com/macros/s/AKfycbwe4C7mSC7WmE28qCXjt5_bLoeISiyZLAs4RhMIOL9awvRKNnBq51qvmhk7qHzBJwOX/exec';
-const SHEET_ID = '1YQQIf6ymzXHtayPuFf6NdncQgZZCSqm-4s_z8v2D25c';
+// --- Supabase ---
+const SB_URL = 'https://ifrtyfypzpfuwzzistfg.supabase.co';
+const SB_KEY = 'sb_publishable_Ms3YLkiCuHi6naSl39_RoQ_S1rpvNza';
+const SB_HEADERS = {
+  'Content-Type': 'application/json',
+  'apikey': SB_KEY,
+  'Authorization': 'Bearer ' + SB_KEY
+};
+
+async function sbGet(key){
+  const res = await fetch(`${SB_URL}/rest/v1/tradelog?key=eq.${key}&select=value`, { headers: SB_HEADERS });
+  const data = await res.json();
+  return data.length ? data[0].value : null;
+}
+
+async function sbSet(key, value){
+  await fetch(`${SB_URL}/rest/v1/tradelog`, {
+    method: 'POST',
+    headers: { ...SB_HEADERS, 'Prefer': 'resolution=merge-duplicates' },
+    body: JSON.stringify({ key, value })
+  });
+}
 
 let trades = [];
 let editIdx = null;
 let selectedEmotions = [];
 
 // --- Storage ---
-// Скриншоты хранятся на Google Drive (ссылки сохраняются в Sheets вместе с данными)
 async function load(){
   setStatus('Загрузка…', false);
   try{
-    const res = await fetch(`${GAS_URL}?id=${SHEET_ID}`, { redirect: 'follow' });
-    const text = await res.text();
-    trades = text && text !== '{}' && text !== '[]' ? JSON.parse(text) : [];
+    const val = await sbGet('trades');
+    trades = val ? JSON.parse(val) : [];
     if(!Array.isArray(trades)) trades = [];
     setStatus('Синхронизировано', true);
   }catch(e){
@@ -560,9 +578,7 @@ async function load(){
 async function save(){
   setStatus('Сохранение…', false);
   try{
-    await fetch(`${GAS_URL}?id=${SHEET_ID}`, {
-      method:'POST', body: JSON.stringify(trades), redirect: 'follow'
-    });
+    await sbSet('trades', JSON.stringify(trades));
     setStatus('Сохранено ✓', true);
     setTimeout(()=>{ if(document.getElementById('statusMsg').textContent === 'Сохранено ✓') setStatus('', true); }, 2000);
   }catch(e){
@@ -838,29 +854,29 @@ function initUpload(){
 async function handleFile(file, idx){
   if(!file) return;
   const status = document.getElementById('uploadStatus');
-  status.textContent = `⏳ Загрузка на Google Drive…`;
+  status.textContent = `⏳ Загрузка скриншота…`;
   status.style.color = 'var(--text-soft)';
   const localUrl = URL.createObjectURL(file);
   document.getElementById(`uploadPreview${idx}`).src = localUrl;
   document.getElementById(`uploadPreviewWrap${idx}`).style.display = 'block';
   document.getElementById(`uploadPlaceholder${idx}`).style.display = 'none';
   try{
-    const base64 = await fileToBase64(file);
-    const FOLDER_ID = '1_vSHXQgkPNU_xWvf8UzmWIG01JmwPMwN';
-    const res = await fetch(
-      `${GAS_URL}?id=${SHEET_ID}&action=upload&folder=${FOLDER_ID}&filename=screenshot_${Date.now()}_${idx}.jpg`,
-      { method:'POST', body: base64, redirect:'follow' }
-    );
-    const data = await res.json();
-    if(data.error) throw new Error(data.error);
-    screenshots[idx] = data.url;
-    document.getElementById(`uploadPreview${idx}`).src = data.url;
+    const filename = `screenshot_${Date.now()}_${idx}.jpg`;
+    const res = await fetch(`${SB_URL}/storage/v1/object/screenshots/${filename}`, {
+      method: 'POST',
+      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': file.type },
+      body: file
+    });
+    if(!res.ok) throw new Error('Upload failed: ' + res.status);
+    const publicUrl = `${SB_URL}/storage/v1/object/public/screenshots/${filename}`;
+    screenshots[idx] = publicUrl;
+    document.getElementById(`uploadPreview${idx}`).src = publicUrl;
     URL.revokeObjectURL(localUrl);
-    status.textContent = `✓ Скриншот ${idx+1} загружен на Drive`;
+    status.textContent = `✓ Скриншот ${idx+1} загружен`;
     status.style.color = 'var(--green)';
   }catch(e){
     screenshots[idx] = '';
-    status.textContent = '⚠ Ошибка загрузки на Drive: ' + e.message;
+    status.textContent = '⚠ Ошибка загрузки: ' + e.message;
     status.style.color = 'var(--red)';
   }
 }
@@ -976,9 +992,8 @@ document.getElementById('bSaveBtn').addEventListener('click', async ()=>{
 
 async function loadBalance(){
   try{
-    const res = await fetch(`${GAS_URL}?id=${SHEET_ID}&sheet=balance`, { redirect:'follow' });
-    const text = await res.text();
-    balanceOps = text && text !== '{}' ? JSON.parse(text) : [];
+    const val = await sbGet('balance');
+    balanceOps = val ? JSON.parse(val) : [];
     if(!Array.isArray(balanceOps)) balanceOps = [];
   }catch(e){ balanceOps = []; }
   renderBalance();
@@ -986,9 +1001,7 @@ async function loadBalance(){
 
 async function saveBalance(){
   try{
-    await fetch(`${GAS_URL}?id=${SHEET_ID}&sheet=balance`, {
-      method:'POST', body: JSON.stringify(balanceOps), redirect:'follow'
-    });
+    await sbSet('balance', JSON.stringify(balanceOps));
   }catch(e){}
 }
 
