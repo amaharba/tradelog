@@ -493,20 +493,58 @@
       <div class="field">
         <label>Скриншоты графика (до 4-х)</label>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          ${[0,1,2,3].map(i=>`
-          <div class="upload-slot" id="uploadSlot${i}">
-            <input type="file" id="fScreenshot${i}" accept="image/*" style="display:none">
-            <div class="upload-area" id="uploadArea${i}">
-              <div class="upload-placeholder" id="uploadPlaceholder${i}">
+          <div class="upload-slot" id="uploadSlot0">
+            <input type="file" id="fScreenshot0" accept="image/*" style="display:none">
+            <div class="upload-area" id="uploadArea0">
+              <div class="upload-placeholder" id="uploadPlaceholder0">
                 <div style="font-size:20px;margin-bottom:4px">📷</div>
-                <div style="font-size:12px;color:var(--text-soft)">Скриншот ${i+1}</div>
+                <div style="font-size:12px;color:var(--text-soft)">Скриншот 1</div>
               </div>
-              <div class="upload-preview-wrap" id="uploadPreviewWrap${i}" style="display:none;position:relative;">
-                <img id="uploadPreview${i}" style="max-width:100%;border-radius:6px;">
-                <button class="upload-del-btn" id="uploadDel${i}" title="Удалить">✕</button>
+              <div class="upload-preview-wrap" id="uploadPreviewWrap0" style="display:none;position:relative;">
+                <img id="uploadPreview0" style="max-width:100%;border-radius:6px;">
+                <button class="upload-del-btn" id="uploadDel0" title="Удалить">✕</button>
               </div>
             </div>
-          </div>`).join('')}
+          </div>
+          <div class="upload-slot" id="uploadSlot1">
+            <input type="file" id="fScreenshot1" accept="image/*" style="display:none">
+            <div class="upload-area" id="uploadArea1">
+              <div class="upload-placeholder" id="uploadPlaceholder1">
+                <div style="font-size:20px;margin-bottom:4px">📷</div>
+                <div style="font-size:12px;color:var(--text-soft)">Скриншот 2</div>
+              </div>
+              <div class="upload-preview-wrap" id="uploadPreviewWrap1" style="display:none;position:relative;">
+                <img id="uploadPreview1" style="max-width:100%;border-radius:6px;">
+                <button class="upload-del-btn" id="uploadDel1" title="Удалить">✕</button>
+              </div>
+            </div>
+          </div>
+          <div class="upload-slot" id="uploadSlot2">
+            <input type="file" id="fScreenshot2" accept="image/*" style="display:none">
+            <div class="upload-area" id="uploadArea2">
+              <div class="upload-placeholder" id="uploadPlaceholder2">
+                <div style="font-size:20px;margin-bottom:4px">📷</div>
+                <div style="font-size:12px;color:var(--text-soft)">Скриншот 3</div>
+              </div>
+              <div class="upload-preview-wrap" id="uploadPreviewWrap2" style="display:none;position:relative;">
+                <img id="uploadPreview2" style="max-width:100%;border-radius:6px;">
+                <button class="upload-del-btn" id="uploadDel2" title="Удалить">✕</button>
+              </div>
+            </div>
+          </div>
+          <div class="upload-slot" id="uploadSlot3">
+            <input type="file" id="fScreenshot3" accept="image/*" style="display:none">
+            <div class="upload-area" id="uploadArea3">
+              <div class="upload-placeholder" id="uploadPlaceholder3">
+                <div style="font-size:20px;margin-bottom:4px">📷</div>
+                <div style="font-size:12px;color:var(--text-soft)">Скриншот 4</div>
+              </div>
+              <div class="upload-preview-wrap" id="uploadPreviewWrap3" style="display:none;position:relative;">
+                <img id="uploadPreview3" style="max-width:100%;border-radius:6px;">
+                <button class="upload-del-btn" id="uploadDel3" title="Удалить">✕</button>
+              </div>
+            </div>
+          </div>
         </div>
         <div id="uploadStatus" style="font-size:12px;color:var(--text-soft);margin-top:6px;"></div>
       </div>
