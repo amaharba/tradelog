@@ -199,6 +199,7 @@
   }
   .emotion-btn:hover{ border-color:var(--text-soft); color:var(--text); }
   .emotion-btn.selected{ border-color:var(--green); background:var(--green-soft); color:var(--green); }
+  .emotion-btn.exit-btn.selected{ border-color:var(--blue); background:var(--blue-soft); color:var(--blue); }
 
   /* Detail panel */
   .detail-overlay{
@@ -397,8 +398,8 @@
         <th style="width:100px">Позиция</th>
         <th style="width:100px">P&L</th>
         <th style="width:80px">Эмоции</th>
-        <th style="width:28%">Причина</th>
-        <th style="width:22%">Заметки</th>
+        <th style="width:18%">Причина</th>
+        <th style="width:14%">Заметки</th>
         <th style="width:80px"></th>
       </tr>
     </thead>
@@ -443,6 +444,10 @@
           <input type="number" id="fEntry" placeholder="0.00" step="any">
         </div>
         <div class="field">
+          <label>Цена выхода</label>
+          <input type="number" id="fExit" placeholder="0.00" step="any">
+        </div>
+        <div class="field">
           <label>Стоп-лосс</label>
           <input type="number" id="fStop" placeholder="0.00" step="any">
         </div>
@@ -458,21 +463,13 @@
           <label>% от депозита</label>
           <input type="number" id="fSizePct" placeholder="5" step="any" min="0" max="100">
         </div>
-        <div class="field">
-          <label>Цена выхода</label>
-          <input type="number" id="fExit" placeholder="0.00" step="any">
-        </div>
-        <div class="field">
-          <label>P&L (USDT)</label>
-          <input type="number" id="fPnl" placeholder="+25.00" step="any">
-        </div>
-        <div class="field">
-          <label>Издержки (комиссии + фандинг)</label>
-          <input type="number" id="fCosts" placeholder="0.00" step="any" min="0">
-        </div>
         <div class="field full" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;">
           <span style="font-size:12px;color:var(--text-soft)">Размер позиции (депозит × % × плечо)</span>
           <span id="fSizeCalc" style="font-size:16px;font-weight:700;color:var(--green)">— USDT</span>
+        </div>
+        <div class="field full">
+          <label>P&L (USDT)</label>
+          <input type="number" id="fPnl" placeholder="+25.00" step="any">
         </div>
       </div>
       <div class="field">
@@ -480,16 +477,31 @@
         <textarea id="fReason" placeholder="Например: пробой уровня сопротивления + объём…"></textarea>
       </div>
       <div class="field">
-        <label>Эмоции во время сделки</label>
+        <label>Эмоции при входе <span style="font-size:10px;color:var(--green);font-weight:600">● зелёный</span></label>
         <div class="emotion-picker" id="emotionPicker">
           <button class="emotion-btn" data-val="Спокойно">Спокойно</button>
           <button class="emotion-btn" data-val="Уверенно">Уверенно</button>
+          <button class="emotion-btn" data-val="Лёгкость">Лёгкость</button>
           <button class="emotion-btn" data-val="Жадность">Жадность</button>
           <button class="emotion-btn" data-val="Страх">Страх</button>
           <button class="emotion-btn" data-val="FOMO">FOMO</button>
           <button class="emotion-btn" data-val="Азарт">Азарт</button>
           <button class="emotion-btn" data-val="Сомнение">Сомнение</button>
           <button class="emotion-btn" data-val="Усталость">Усталость</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Эмоции при выходе <span style="font-size:10px;color:var(--blue);font-weight:600">● синий</span></label>
+        <div class="emotion-picker" id="emotionExitPicker">
+          <button class="emotion-btn exit-btn" data-val="Спокойно">Спокойно</button>
+          <button class="emotion-btn exit-btn" data-val="Уверенно">Уверенно</button>
+          <button class="emotion-btn exit-btn" data-val="Лёгкость">Лёгкость</button>
+          <button class="emotion-btn exit-btn" data-val="Жадность">Жадность</button>
+          <button class="emotion-btn exit-btn" data-val="Страх">Страх</button>
+          <button class="emotion-btn exit-btn" data-val="FOMO">FOMO</button>
+          <button class="emotion-btn exit-btn" data-val="Азарт">Азарт</button>
+          <button class="emotion-btn exit-btn" data-val="Сомнение">Сомнение</button>
+          <button class="emotion-btn exit-btn" data-val="Усталость">Усталость</button>
         </div>
       </div>
       <div class="field">
@@ -599,7 +611,9 @@ async function sbSet(key, value){
 
 let trades = [];
 let editIdx = null;
+let currentFormSize = 0; // размер позиции для текущей формы
 let selectedEmotions = [];
+let selectedExitEmotions = [];
 
 // --- Storage ---
 async function load(){
@@ -677,7 +691,7 @@ function renderTable(){
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td style="color:var(--text-muted);font-size:12px">${realIdx+1}</td>
-      <td style="color:var(--text-soft);font-size:12px">${(t.dateIn||'—').replace('2026-','')}</td>
+      <td style="color:var(--text-soft);font-size:12px">${(t.dateIn||'—').replace('2026-','')}${t.dateOut ? ' → ' + t.dateOut.replace('2026-','') : ''}</td>
       <td><span class="coin">${t.coin || '—'}</span></td>
       <td><span class="direction ${(t.direction||'').toLowerCase()}">${t.direction || '—'}</span></td>
       <td style="font-size:13px">${t.entry || '—'}</td>
@@ -685,7 +699,12 @@ function renderTable(){
       <td style="font-size:13px">×${t.leverage || '—'}</td>
       <td style="font-size:13px">${t.size ? t.size + ' $' : '—'}</td>
       <td><span class="pnl ${pnlClass}">${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} $</span></td>
-      <td style="font-size:12px;color:var(--text-soft)">${t.emotion || '—'}</td>
+      <td style="font-size:12px">
+        ${t.emotion ? `<span style="color:var(--green)">${t.emotion}</span>` : ''}
+        ${t.emotion && t.emotionExit ? '<br>' : ''}
+        ${t.emotionExit ? `<span style="color:var(--blue)">${t.emotionExit}</span>` : ''}
+        ${!t.emotion && !t.emotionExit ? '—' : ''}
+      </td>
       <td class="clip-cell">${t.reason || '—'}${t.reason ? `<div class="clip-tooltip">${t.reason.replace(/</g,'&lt;')}</div>` : ''}</td>
       <td class="clip-cell">${t.notes || '—'}${t.notes ? `<div class="clip-tooltip">${t.notes.replace(/</g,'&lt;')}</div>` : ''}</td>
       <td style="white-space:nowrap">
@@ -727,7 +746,8 @@ function showDetail(idx){
     ['Размер позиции', t.size ? t.size + ' USDT' : '—'],
     ['Издержки', t.costs ? '−' + parseFloat(t.costs).toFixed(2) + ' $' : '—'],
     ['P&L', `<span class="pnl ${pnl>0?'pos':pnl<0?'neg':'zero'}">${pnl>=0?'+':''}${pnl.toFixed(2)} $</span>`],
-    ['Эмоции', t.emotion || '—'],
+    ['Эмоции (вход)', t.emotion || '—'],
+    ['Эмоции (выход)', t.emotionExit || '—'],
   ];
   let html = rows.map(([l,v])=>`<div class="detail-row"><span class="label">${l}</span><span class="val">${v||'—'}</span></div>`).join('');
   if(t.reason) html += `<div class="detail-note"><div class="label">Причина входа</div><div class="val" style="max-height:80px;overflow:hidden;cursor:pointer;position:relative" onclick="this.style.maxHeight=this.style.maxHeight==='none'?'80px':'none'">${t.reason}<div style="position:absolute;bottom:0;left:0;right:0;height:24px;background:linear-gradient(transparent,var(--surface));pointer-events:none"></div></div><span style="font-size:11px;color:var(--green);cursor:pointer" onclick="var v=this.previousElementSibling;v.style.maxHeight=v.style.maxHeight==='none'?'80px':'none';this.textContent=v.style.maxHeight==='none'?'▲ Свернуть':'▼ Читать полностью'">▼ Читать полностью</span></div>`;
@@ -773,13 +793,16 @@ function openEdit(idx){
   document.getElementById('fLeverage').value = t.leverage || '';
 
   document.getElementById('fPnl').value = t.pnl || '';
-  document.getElementById('fCosts').value = t.costs || '';
   document.getElementById('fReason').value = t.reason || '';
   document.getElementById('fNotes').value = t.notes || '';
   document.getElementById('fSizePct').value = t.sizePct || '';
   selectedEmotions = t.emotion ? t.emotion.split(', ').filter(Boolean) : [];
-  document.querySelectorAll('.emotion-btn').forEach(b=>{
+  document.querySelectorAll('#emotionPicker .emotion-btn').forEach(b=>{
     b.classList.toggle('selected', selectedEmotions.includes(b.dataset.val));
+  });
+  selectedExitEmotions = t.emotionExit ? t.emotionExit.split(', ').filter(Boolean) : [];
+  document.querySelectorAll('#emotionExitPicker .exit-btn').forEach(b=>{
+    b.classList.toggle('selected', selectedExitEmotions.includes(b.dataset.val));
   });
   // load existing screenshots
   resetUpload();
@@ -790,17 +813,27 @@ function openEdit(idx){
     document.getElementById(`uploadPreviewWrap${i}`).style.display = 'block';
     document.getElementById(`uploadPlaceholder${i}`).style.display = 'none';
   });
-  updateSizeCalc();
+  // при редактировании показываем сохранённый размер, не пересчитываем от текущего баланса
+  if(t.size){
+    const el = document.getElementById('fSizeCalc');
+    el.textContent = t.size + ' USDT';
+    el.style.color = 'var(--green)';
+    currentFormSize = parseFloat(t.size) || 0;
+  } else {
+    updateSizeCalc();
+  }
   document.getElementById('detailOverlay').classList.remove('open');
   document.getElementById('tradeModal').classList.add('open');
 }
 
 function clearForm(){
-  ['fCoin','fDateIn','fDateOut','fEntry','fStop','fTake','fExit','fLeverage','fSizePct','fPnl','fCosts','fReason','fNotes']
+  ['fCoin','fDateIn','fDateOut','fEntry','fStop','fTake','fExit','fLeverage','fSizePct','fPnl','fReason','fNotes']
     .forEach(id=>{ document.getElementById(id).value=''; });
   document.getElementById('fSizeCalc').textContent = '— USDT';
+  currentFormSize = 0;
   document.getElementById('fDir').value = 'LONG';
   selectedEmotions = [];
+  selectedExitEmotions = [];
   document.querySelectorAll('.emotion-btn').forEach(b=>b.classList.remove('selected'));
   document.getElementById('fDateIn').value = new Date().toISOString().split('T')[0];
   resetUpload();
@@ -817,18 +850,26 @@ document.getElementById('tradeModal').addEventListener('click', e=>{
   if(e.target === document.getElementById('tradeModal')) closeModal();
 });
 
-document.querySelectorAll('.emotion-btn').forEach(btn=>{
+document.querySelectorAll('#emotionPicker .emotion-btn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     const val = btn.dataset.val;
     const idx = selectedEmotions.indexOf(val);
-    if(idx > -1){
-      selectedEmotions.splice(idx, 1);
-    } else {
-      if(selectedEmotions.length >= 3) return; // max 3
-      selectedEmotions.push(val);
-    }
-    document.querySelectorAll('.emotion-btn').forEach(b=>{
+    if(idx > -1){ selectedEmotions.splice(idx, 1); }
+    else { if(selectedEmotions.length >= 3) return; selectedEmotions.push(val); }
+    document.querySelectorAll('#emotionPicker .emotion-btn').forEach(b=>{
       b.classList.toggle('selected', selectedEmotions.includes(b.dataset.val));
+    });
+  });
+});
+
+document.querySelectorAll('#emotionExitPicker .exit-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const val = btn.dataset.val;
+    const idx = selectedExitEmotions.indexOf(val);
+    if(idx > -1){ selectedExitEmotions.splice(idx, 1); }
+    else { if(selectedExitEmotions.length >= 3) return; selectedExitEmotions.push(val); }
+    document.querySelectorAll('#emotionExitPicker .exit-btn').forEach(b=>{
+      b.classList.toggle('selected', selectedExitEmotions.includes(b.dataset.val));
     });
   });
 });
@@ -846,14 +887,25 @@ document.getElementById('modalSave').addEventListener('click', async ()=>{
     take:      document.getElementById('fTake').value,
     exitPrice: document.getElementById('fExit').value,
     leverage:  document.getElementById('fLeverage').value,
-    size:      (()=>{ const p=parseFloat(document.getElementById('fSizePct').value)||0; const l=parseFloat(document.getElementById('fLeverage').value)||0; const b=calcBalance(); return (p>0&&l>0&&b>0)?(b*p/100*l).toFixed(2):''; })(),
-    pnl:       document.getElementById('fPnl').value,
-    costs:     document.getElementById('fCosts').value,
-    reason:    document.getElementById('fReason').value.trim(),
-    emotion:   selectedEmotions.join(', '),
-    notes:     document.getElementById('fNotes').value.trim(),
     sizePct:    document.getElementById('fSizePct').value,
-    size:       (()=>{ const p=parseFloat(document.getElementById('fSizePct').value)||0; const l=parseFloat(document.getElementById('fLeverage').value)||0; const b=calcBalance(); return (p>0&&l>0&&b>0)?(b*p/100*l).toFixed(2):''; })(),
+    size:       (()=>{
+      // при редактировании сохраняем старый размер если % не изменился
+      if(editIdx !== null){
+        const old = trades[editIdx];
+        if(old && old.sizePct === document.getElementById('fSizePct').value && old.leverage === document.getElementById('fLeverage').value && old.size){
+          return old.size;
+        }
+      }
+      const p=parseFloat(document.getElementById('fSizePct').value)||0;
+      const l=parseFloat(document.getElementById('fLeverage').value)||0;
+      const b=calcBalance();
+      return (p>0&&l>0&&b>0)?(b*p/100*l).toFixed(2):'';
+    })(),
+    pnl:       document.getElementById('fPnl').value,
+    reason:    document.getElementById('fReason').value.trim(),
+    emotion:     selectedEmotions.join(', '),
+    emotionExit: selectedExitEmotions.join(', '),
+    notes:     document.getElementById('fNotes').value.trim(),
     screenshots: screenshots.filter(Boolean).length ? [...screenshots] : (editIdx !== null ? trades[editIdx].screenshots || [] : []),
   };
   if(editIdx !== null){ trades[editIdx] = trade; }
@@ -861,6 +913,7 @@ document.getElementById('modalSave').addEventListener('click', async ()=>{
   closeModal();
   renderTable();
   renderStats();
+  renderBalance();
   await save();
 });
 
@@ -871,6 +924,7 @@ async function deleteTrade(idx){
   document.getElementById('detailOverlay').classList.remove('open');
   renderTable();
   renderStats();
+  renderBalance();
   await save();
 }
 
@@ -970,9 +1024,11 @@ function updateSizeCalc(){
     const size = (bal * pct / 100 * lev).toFixed(2);
     el.textContent = size + ' USDT';
     el.style.color = 'var(--green)';
+    currentFormSize = parseFloat(size);
   } else {
     el.textContent = '— USDT';
     el.style.color = 'var(--text-soft)';
+    currentFormSize = 0;
   }
 }
 
@@ -1111,6 +1167,8 @@ document.addEventListener('mousemove', e=>{
   tooltip.style.left = x + 'px';
   tooltip.style.top = y + 'px';
 });
+
+
 
 // position calc listeners
 document.getElementById('fSizePct').addEventListener('input', updateSizeCalc);
