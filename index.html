@@ -612,6 +612,7 @@ async function sbSet(key, value){
 let trades = [];
 let editIdx = null;
 let currentFormSize = 0; // размер позиции для текущей формы
+let balanceAtOpen = 0;  // баланс на момент открытия формы
 let selectedEmotions = [];
 let selectedExitEmotions = [];
 
@@ -629,6 +630,7 @@ async function load(){
   }
   renderTable();
   renderStats();
+  renderBalance();
 }
 
 async function save(){
@@ -697,7 +699,7 @@ function renderTable(){
       <td style="font-size:13px">${t.entry || '—'}</td>
       <td style="font-size:13px;color:${t.exitPrice?'var(--text)':'var(--text-muted)'}">${t.exitPrice || '—'}</td>
       <td style="font-size:13px">×${t.leverage || '—'}</td>
-      <td style="font-size:13px">${t.size ? t.size + ' $' : '—'}</td>
+      <td style="font-size:13px">${(()=>{ const s=getTradeSize(t); return s ? s + ' $' : '—'; })()}</td>
       <td><span class="pnl ${pnlClass}">${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} $</span></td>
       <td style="font-size:12px">
         ${t.emotion ? `<span style="color:var(--green)">${t.emotion}</span>` : ''}
@@ -743,7 +745,7 @@ function showDetail(idx){
     ['Цена выхода', t.exitPrice],
     ['Плечо', t.leverage ? '×' + t.leverage : '—'],
     ['% от депозита', t.sizePct ? t.sizePct + '%' : '—'],
-    ['Размер позиции', t.size ? t.size + ' USDT' : '—'],
+    ['Размер позиции', (()=>{ const s=getTradeSize(t); return s ? s + ' USDT' : '—'; })()],
     ['Издержки', t.costs ? '−' + parseFloat(t.costs).toFixed(2) + ' $' : '—'],
     ['P&L', `<span class="pnl ${pnl>0?'pos':pnl<0?'neg':'zero'}">${pnl>=0?'+':''}${pnl.toFixed(2)} $</span>`],
     ['Эмоции (вход)', t.emotion || '—'],
@@ -771,8 +773,36 @@ document.getElementById('detailOverlay').addEventListener('click', e=>{
 });
 
 // --- Modal ---
+function getTradeSize(t){
+  // если есть sizePct и leverage — считаем динамически от баланса на дату входа
+  const pct = parseFloat(t.sizePct) || 0;
+  const lev = parseFloat(t.leverage) || 0;
+  if(pct > 0 && lev > 0 && t.dateIn){
+    const bal = calcBalanceAtDate(t.dateIn);
+    if(bal > 0) return (bal * pct / 100 * lev).toFixed(2);
+  }
+  // fallback на сохранённый размер
+  return t.size || null;
+}
+
+function calcBalanceAtDate(dateISO){
+  // баланс на начало указанного дня — исключаем сделки открытые в этот день или позже
+  const opsTotal = balanceOps.reduce((s,op)=>{
+    const a = parseFloat(op.amount)||0;
+    return s + (op.type === 'withdraw' ? -a : a);
+  }, 0);
+  const tradePnlBefore = trades.reduce((s,t)=>{
+    // включаем только сделки, которые ЗАКРЫЛИСЬ ДО этой даты
+    if(t.dateOut && t.dateOut < dateISO) return s + (parseFloat(t.pnl)||0);
+    return s;
+  }, 0);
+  return opsTotal + tradePnlBefore;
+}
+
 function openAdd(){
   editIdx = null;
+  const todayISO = new Date().toISOString().split('T')[0];
+  balanceAtOpen = calcBalanceAtDate(todayISO);
   document.getElementById('modalTitle').textContent = 'Новая сделка';
   clearForm();
   document.getElementById('tradeModal').classList.add('open');
@@ -814,11 +844,12 @@ function openEdit(idx){
     document.getElementById(`uploadPlaceholder${i}`).style.display = 'none';
   });
   // при редактировании показываем сохранённый размер, не пересчитываем от текущего баланса
-  if(t.size){
+  const dynSize = getTradeSize(t);
+  if(dynSize){
     const el = document.getElementById('fSizeCalc');
-    el.textContent = t.size + ' USDT';
+    el.textContent = dynSize + ' USDT';
     el.style.color = 'var(--green)';
-    currentFormSize = parseFloat(t.size) || 0;
+    currentFormSize = parseFloat(dynSize) || 0;
   } else {
     updateSizeCalc();
   }
@@ -835,7 +866,9 @@ function clearForm(){
   selectedEmotions = [];
   selectedExitEmotions = [];
   document.querySelectorAll('.emotion-btn').forEach(b=>b.classList.remove('selected'));
-  document.getElementById('fDateIn').value = new Date().toISOString().split('T')[0];
+  const todayISO = new Date().toISOString().split('T')[0];
+  document.getElementById('fDateIn').value = todayISO;
+  document.getElementById('fDateOut').value = todayISO;
   resetUpload();
 }
 
@@ -888,19 +921,6 @@ document.getElementById('modalSave').addEventListener('click', async ()=>{
     exitPrice: document.getElementById('fExit').value,
     leverage:  document.getElementById('fLeverage').value,
     sizePct:    document.getElementById('fSizePct').value,
-    size:       (()=>{
-      // при редактировании сохраняем старый размер если % не изменился
-      if(editIdx !== null){
-        const old = trades[editIdx];
-        if(old && old.sizePct === document.getElementById('fSizePct').value && old.leverage === document.getElementById('fLeverage').value && old.size){
-          return old.size;
-        }
-      }
-      const p=parseFloat(document.getElementById('fSizePct').value)||0;
-      const l=parseFloat(document.getElementById('fLeverage').value)||0;
-      const b=calcBalance();
-      return (p>0&&l>0&&b>0)?(b*p/100*l).toFixed(2):'';
-    })(),
     pnl:       document.getElementById('fPnl').value,
     reason:    document.getElementById('fReason').value.trim(),
     emotion:     selectedEmotions.join(', '),
@@ -1018,7 +1038,15 @@ function resetUpload(){
 function updateSizeCalc(){
   const pct = parseFloat(document.getElementById('fSizePct').value) || 0;
   const lev = parseFloat(document.getElementById('fLeverage').value) || 0;
-  const bal = calcBalance();
+  let bal;
+  if(editIdx === null){
+    // новая сделка — баланс на дату входа
+    const dateIn = document.getElementById('fDateIn').value;
+    bal = dateIn ? calcBalanceAtDate(dateIn) : balanceAtOpen;
+  } else {
+    // редактирование — используем сохранённый размер
+    bal = calcBalance();
+  }
   const el = document.getElementById('fSizeCalc');
   if(pct > 0 && lev > 0 && bal > 0){
     const size = (bal * pct / 100 * lev).toFixed(2);
