@@ -166,6 +166,10 @@
   .combo-total b{ font-size:15px; }
   .combo-hint{ font-size:12px; color:var(--gold); margin-top:6px; }
 
+  .draft-note{ display:none; align-items:center; justify-content:space-between; gap:10px; background:var(--blue-soft); color:var(--blue); border-radius:var(--radius); padding:8px 12px; margin-bottom:14px; font-size:12px; font-weight:600; }
+  .draft-note.show{ display:flex; }
+  .draft-note button{ background:none; border:1px solid currentColor; color:inherit; border-radius:6px; padding:3px 10px; font-family:inherit; font-size:12px; font-weight:600; cursor:pointer; }
+
   /* баннер «нет связи с базой» */
   .offline-banner{ display:none; background:var(--red-soft); color:var(--red); border-bottom:1px solid var(--red); padding:10px 24px; font-size:13px; font-weight:500; align-items:center; gap:14px; flex-wrap:wrap; }
   .offline-banner.show{ display:flex; }
@@ -593,6 +597,10 @@
       <button class="modal-close" id="modalClose">✕</button>
     </div>
     <div class="modal-body">
+      <div class="draft-note" id="draftNote">
+        <span id="draftText">Восстановлен несохранённый черновик</span>
+        <button type="button" id="draftDiscard">Начать заново</button>
+      </div>
       <div class="mode-switch" id="modeSwitch">
         <button type="button" data-mode="single" class="active">Одна монета</button>
         <button type="button" data-mode="combo">Комбинация</button>
@@ -646,16 +654,17 @@
           <input type="number" id="fLeverage" placeholder="10" min="1">
         </div>
         <div class="field single-only">
-          <label>% от депозита</label>
-          <input type="number" id="fSizePct" placeholder="5" step="any" min="0" max="100">
+          <label>Объём (монет)</label>
+          <input type="number" id="fVolume" placeholder="Closed Vol из Binance" step="any" min="0">
+          <input type="hidden" id="fSizePct">
         </div>
         <div class="field full single-only" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;">
-          <span style="font-size:12px;color:var(--text-soft)">Размер позиции (депозит × % × плечо)</span>
+          <span style="font-size:12px;color:var(--text-soft)">Размер позиции (объём × вход)<br><span id="fSizeSub" style="font-size:11px"></span></span>
           <span id="fSizeCalc" style="font-size:16px;font-weight:700;color:var(--green)">— USDT</span>
         </div>
         <div class="field full single-only">
           <label>P&L (USDT)</label>
-          <input type="number" id="fPnl" placeholder="+25.00" step="any">
+          <input type="text" inputmode="decimal" id="fPnl" placeholder="+25.00 или -12,5">
         </div>
         <div class="field full combo-only" style="display:none">
           <label>Монеты</label>
@@ -904,15 +913,17 @@ async function load(){
 }
 
 async function save(){
-  if(!tradesOk){ setStatus('Не сохранено: нет связи с базой', false); return; }
+  if(!tradesOk){ setStatus('Не сохранено: нет связи с базой', false); return false; }
   setStatus('Сохранение…', false);
   try{
     await sbSet('trades', JSON.stringify(trades));
     localSave('trades', trades);
     setStatus('Сохранено ✓', true);
     setTimeout(()=>{ if(document.getElementById('statusMsg').textContent === 'Сохранено ✓') setStatus('', true); }, 2000);
+    return true;
   }catch(e){
     setStatus('Ошибка сохранения', false);
+    return false;
   }
 }
 
@@ -1076,8 +1087,13 @@ function showDetail(idx){
     ['Тейк-профит', t.take],
     ['Цена выхода', t.exitPrice],
     ['Плечо', t.leverage ? '×' + t.leverage : '—'],
-    ['% от депозита', t.sizePct ? t.sizePct + '%' : '—'],
+    ['Объём', t.volume ? t.volume + ' ' + escHtml(t.coin) : '—'],
     ['Размер позиции', (()=>{ const s=getTradeSize(t); return s ? s + ' USDT' : '—'; })()],
+    ['% от депозита', (()=>{
+      if(!t.volume) return t.sizePct ? t.sizePct + '%' : '—';
+      const dp = depoPct(parseFloat(getTradeSize(t)), parseFloat(t.leverage), t.dateIn ? calcBalanceAtDate(t.dateIn, idx) : 0);
+      return dp ? dp.toFixed(1) + '% (маржа)' : '—';
+    })()],
     ['Издержки', t.costs ? '−' + parseFloat(t.costs).toFixed(2) + ' $' : '—'],
     ['P&L', `<span class="pnl ${pnl>0?'pos':pnl<0?'neg':'zero'}">${pnl>=0?'+':''}${pnl.toFixed(2)} $</span>`],
     ['Эмоции (вход)', t.emotion || '—'],
@@ -1092,7 +1108,7 @@ function showDetail(idx){
         <div style="display:flex;justify-content:space-between;align-items:center"><span><b style="font-size:13px">${escHtml(l.coin)}</b> <span class="direction ${(l.direction||'').toLowerCase()}">${l.direction}</span></span>
         <span class="pnl ${lp>0?'pos':lp<0?'neg':'zero'}">${lp>=0?'+':''}${lp.toFixed(2)} $</span></div>
         <div style="color:var(--text-soft)">Вход ${l.entry||'—'} · выход ${l.exit||'—'} · стоп ${l.stop||'—'} · тейк ${l.take||'—'}</div>
-        <div style="color:var(--text-soft)">×${l.leverage||'—'} · ${l.sizePct ? l.sizePct + '% депозита' : '% не указан'}${sz ? ' · ' + sz.toFixed(2) + ' USDT' : ''}</div>
+        <div style="color:var(--text-soft)">×${l.leverage||'—'} · ${l.volume ? 'объём ' + l.volume : (l.sizePct ? l.sizePct + '% депозита' : 'объём не указан')}${sz ? ' · ' + sz.toFixed(2) + ' USDT' : ''}</div>
       </div>`; }).join('')}</div>`;
   }
   if(t.reason) html += `<div class="detail-note"><div class="label">Причина входа</div><div class="val" style="max-height:80px;overflow:hidden;cursor:pointer;position:relative" onclick="this.style.maxHeight=this.style.maxHeight==='none'?'80px':'none'">${t.reason}<div style="position:absolute;bottom:0;left:0;right:0;height:24px;background:linear-gradient(transparent,var(--surface));pointer-events:none"></div></div><span style="font-size:11px;color:var(--green);cursor:pointer" onclick="var v=this.previousElementSibling;v.style.maxHeight=v.style.maxHeight==='none'?'80px':'none';this.textContent=v.style.maxHeight==='none'?'▲ Свернуть':'▼ Читать полностью'">▼ Читать полностью</span></div>`;
@@ -1134,9 +1150,16 @@ function fmtDate(iso, withYear){
 }
 
 function legSize(leg, bal){
+  const vol = parseFloat(leg.volume) || 0, entry = parseFloat(leg.entry) || 0;
+  if(vol > 0 && entry > 0) return vol * entry;
   const pct = parseFloat(leg.sizePct) || 0;
   const lev = parseFloat(leg.leverage) || 0;
   return (pct > 0 && lev > 0 && bal > 0) ? bal * pct / 100 * lev : 0;
+}
+
+// какую часть депозита заняла маржа сделки (%)
+function depoPct(size, lev, bal){
+  return (size > 0 && lev > 0 && bal > 0) ? size / lev / bal * 100 : 0;
 }
 
 function getTradeSize(t){
@@ -1145,7 +1168,10 @@ function getTradeSize(t){
     const sum = t.legs.reduce((s, l) => s + legSize(l, bal), 0);
     return sum > 0 ? sum.toFixed(2) : null;
   }
-  // если есть sizePct и leverage — считаем динамически от баланса на дату входа
+  // объём × цена входа
+  const vol = parseFloat(t.volume) || 0, entry = parseFloat(t.entry) || 0;
+  if(vol > 0 && entry > 0) return (vol * entry).toFixed(2);
+  // старые сделки: % депозита × плечо от баланса на дату входа
   const pct = parseFloat(t.sizePct) || 0;
   const lev = parseFloat(t.leverage) || 0;
   if(pct > 0 && lev > 0 && t.dateIn){
@@ -1187,12 +1213,18 @@ function opDateISO(d){
   return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
 }
 
+// "+30" -> "30", "−12,5" -> "-12.5"; пустое остаётся пустым
+function normNum(v){
+  const t = String(v ?? '').trim().replace(/\s/g,'').replace(/[−–]/g,'-').replace(',', '.').replace(/^\+/, '');
+  return t === '' || isNaN(parseFloat(t)) ? '' : String(parseFloat(t));
+}
+
 // ---------- комбинированные сделки ----------
 let formMode = 'single';
 let comboLegs = [];
 let editOldPnl = null;   // общий P&L сделки до перевода в комбинацию
 
-function emptyLeg(dir){ return { coin:'', direction: dir || 'LONG', entry:'', exit:'', stop:'', take:'', leverage:'', sizePct:'', pnl:'' }; }
+function emptyLeg(dir){ return { coin:'', direction: dir || 'LONG', entry:'', exit:'', stop:'', take:'', leverage:'', volume:'', pnl:'' }; }
 function comboKind(){ return document.getElementById('fComboType').value; }  // basket-LONG | basket-SHORT | hedge
 
 function setFormMode(mode){
@@ -1220,7 +1252,7 @@ function seedLegsFromSingle(){
       { ...emptyLeg(dir), coin: coins[0] || '',
         entry: document.getElementById('fEntry').value, exit: document.getElementById('fExit').value,
         stop: document.getElementById('fStop').value, take: document.getElementById('fTake').value,
-        leverage: lev, sizePct: document.getElementById('fSizePct').value, pnl: document.getElementById('fPnl').value },
+        leverage: lev, volume: document.getElementById('fVolume').value, sizePct: document.getElementById('fSizePct').value, pnl: document.getElementById('fPnl').value },
       emptyLeg(dir)
     ];
   }
@@ -1229,7 +1261,7 @@ function seedLegsFromSingle(){
 const LEG_FIELDS = [
   ['coin','Монета','text','ZEC'], ['entry','Вход','number','0.00'], ['exit','Выход','number','0.00'],
   ['stop','Стоп','number','0.00'], ['take','Тейк','number','0.00'], ['leverage','Плечо ×','number','5'],
-  ['sizePct','% депоз.','number','30'], ['pnl','P&L $','number','+0.00']
+  ['volume','Объём','number','21307'], ['pnl','P&L $','decimal','+0.00']
 ];
 
 function renderLegs(){
@@ -1262,7 +1294,7 @@ function renderLegs(){
   updateComboTotals();
 }
 function legInput(l, i, [f, label, type, ph]){
-  return `<div class="field"><label>${label}</label><input type="${type}" ${type==='number'?'step="any"':''} placeholder="${ph}" value="${escHtml(l[f])}" data-leg="${i}" data-f="${f}" ${f==='coin'?'style="text-transform:uppercase"':''}></div>`;
+  return `<div class="field"><label>${label}</label><input type="${type==='decimal'?'text':type}" ${type==='number'?'step="any"':''} ${type==='decimal'?'inputmode="decimal"':''} placeholder="${ph}" value="${escHtml(l[f])}" data-leg="${i}" data-f="${f}" ${f==='coin'?'style="text-transform:uppercase"':''}></div>`;
 }
 
 function updateComboTotals(){
@@ -1272,20 +1304,20 @@ function updateComboTotals(){
   let size = 0, pnl = 0, pct = 0;
   comboLegs.forEach((l, i) => {
     const sz = legSize(l, bal);
-    size += sz; pnl += parseFloat(l.pnl) || 0; pct += parseFloat(l.sizePct) || 0;
+    size += sz; pnl += parseFloat(normNum(l.pnl)) || 0; pct += depoPct(sz, parseFloat(l.leverage), bal);
     const el = document.getElementById('legSize' + i);
     if(el) el.textContent = sz ? '· ' + sz.toFixed(2) + ' USDT' : '';
   });
   const pc = pnl > 0 ? 'var(--green)' : pnl < 0 ? 'var(--red)' : 'var(--text-soft)';
   document.getElementById('comboTotal').innerHTML = `
     <span>Позиция: <b>${size ? size.toFixed(2) + ' USDT' : '—'}</b></span>
-    <span>Депозит: <b style="color:${pct > 100 ? 'var(--red)' : 'inherit'}">${pct ? +pct.toFixed(2) + '%' : '—'}</b></span>
+    <span>Маржа: <b style="color:${pct > 100 ? 'var(--red)' : 'inherit'}">${pct ? pct.toFixed(1) + '% депозита' : '—'}</b></span>
     <span>P&L итого: <b style="color:${pc}">${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} $</b></span>`;
   const hint = document.getElementById('comboHint');
   const old = parseFloat(editOldPnl);
   hint.textContent = (editOldPnl !== null && !isNaN(old) && Math.abs(old - pnl) > 0.005)
     ? `Раньше у сделки был общий P&L ${old >= 0 ? '+' : ''}${old.toFixed(2)} $ — распредели его по монетам.`
-    : (pct > 100 ? 'Сумма % депозита больше 100.' : '');
+    : (pct > 100 ? 'Маржа по всем монетам больше депозита — проверь объёмы и плечо.' : '');
 }
 
 document.querySelectorAll('#modeSwitch button').forEach(b => b.addEventListener('click', () => setFormMode(b.dataset.mode)));
@@ -1299,16 +1331,83 @@ document.getElementById('legAdd').addEventListener('click', () => {
 });
 document.getElementById('fDateIn').addEventListener('change', updateComboTotals);
 
+// ---------- черновик сделки ----------
+const DRAFT_KEY = 'tradelog-draft';
+const DRAFT_FIELDS = ['fCoin','fDir','fDateIn','fDateOut','fEntry','fExit','fStop','fTake','fLeverage','fVolume','fSizePct','fPnl','fReason','fNotes','fComboType'];
+let draftSig = 'new';      // 'new' — новая сделка, иначе подпись редактируемой сделки
+let draftTimer = null;
+
+function tradeSig(t){ return 'edit|' + [t.dateIn, t.coin, t.direction, t.pnl].join('|'); }
+
+function collectDraft(){
+  const f = {};
+  DRAFT_FIELDS.forEach(id => f[id] = document.getElementById(id).value);
+  return { sig: draftSig, at: Date.now(), fields: f, formMode,
+           comboLegs: JSON.parse(JSON.stringify(comboLegs)),
+           emotions: [...selectedEmotions], emotionsExit: [...selectedExitEmotions],
+           screenshots: [...screenshots] };
+}
+function saveDraft(){
+  if(!document.getElementById('tradeModal').classList.contains('open')) return;
+  try{ localStorage.setItem(DRAFT_KEY, JSON.stringify(collectDraft())); }catch(e){}
+}
+function saveDraftSoon(){ clearTimeout(draftTimer); draftTimer = setTimeout(saveDraft, 300); }
+function clearDraft(){ try{ localStorage.removeItem(DRAFT_KEY); }catch(e){} document.getElementById('draftNote').classList.remove('show'); }
+function loadDraft(){ try{ const v = localStorage.getItem(DRAFT_KEY); return v ? JSON.parse(v) : null; }catch(e){ return null; } }
+
+function applyDraft(d){
+  DRAFT_FIELDS.forEach(id => { if(d.fields && id in d.fields) document.getElementById(id).value = d.fields[id]; });
+  selectedEmotions = d.emotions || [];
+  selectedExitEmotions = d.emotionsExit || [];
+  document.querySelectorAll('#emotionPicker .emotion-btn').forEach(b => b.classList.toggle('selected', selectedEmotions.includes(b.dataset.val)));
+  document.querySelectorAll('#emotionExitPicker .exit-btn').forEach(b => b.classList.toggle('selected', selectedExitEmotions.includes(b.dataset.val)));
+  resetUpload();
+  (d.screenshots || []).forEach((src, i) => {
+    if(i > 3 || !src) return;
+    screenshots[i] = src;
+    document.getElementById(`uploadPreview${i}`).src = src;
+    document.getElementById(`uploadPreviewWrap${i}`).style.display = 'block';
+    document.getElementById(`uploadPlaceholder${i}`).style.display = 'none';
+  });
+  comboLegs = Array.isArray(d.comboLegs) ? d.comboLegs : [];
+  setFormMode(d.formMode === 'combo' ? 'combo' : 'single');
+  updateSizeCalc();
+  document.getElementById('draftText').textContent = 'Восстановлен несохранённый черновик от ' + fmtStamp(d.at);
+  document.getElementById('draftNote').classList.add('show');
+}
+// если есть черновик для этой сделки — подставляем его
+function restoreDraftIfAny(){
+  document.getElementById('draftNote').classList.remove('show');
+  const d = loadDraft();
+  if(d && d.sig === draftSig) applyDraft(d);
+}
+
+// любое изменение в окне сделки — сохраняем черновик
+['input','change','click'].forEach(ev =>
+  document.getElementById('tradeModal').addEventListener(ev, saveDraftSoon));
+// на случай загрузки скринов и прочих фоновых изменений
+setInterval(saveDraft, 3000);
+window.addEventListener('beforeunload', saveDraft);
+
+document.getElementById('draftDiscard').addEventListener('click', e => {
+  e.stopPropagation();
+  clearDraft();
+  if(editIdx === null){ clearForm(); }
+  else { const i = editIdx; openEdit(i, true); }
+});
+
 function openAdd(){
   editIdx = null;
   const todayISO = new Date().toISOString().split('T')[0];
   balanceAtOpen = calcBalanceAtDate(todayISO);
   document.getElementById('modalTitle').textContent = 'Новая сделка';
   clearForm();
+  draftSig = 'new';
+  restoreDraftIfAny();
   document.getElementById('tradeModal').classList.add('open');
 }
 
-function openEdit(idx){
+function openEdit(idx, skipDraft){
   editIdx = idx;
   document.getElementById('modalTitle').textContent = 'Редактировать сделку';
   const t = trades[idx];
@@ -1326,6 +1425,7 @@ function openEdit(idx){
   document.getElementById('fReason').value = t.reason || '';
   document.getElementById('fNotes').value = t.notes || '';
   document.getElementById('fSizePct').value = t.sizePct || '';
+  document.getElementById('fVolume').value = t.volume || '';
   if(Array.isArray(t.legs) && t.legs.length){
     comboLegs = t.legs.map(l => ({ ...emptyLeg(), ...l }));
     document.getElementById('fComboType').value = t.combo === 'hedge' ? 'hedge' : 'basket-' + (t.direction === 'SHORT' ? 'SHORT' : 'LONG');
@@ -1355,23 +1455,19 @@ function openEdit(idx){
     document.getElementById(`uploadPlaceholder${i}`).style.display = 'none';
   });
   // при редактировании показываем сохранённый размер, не пересчитываем от текущего баланса
-  const dynSize = getTradeSize(t);
-  if(dynSize && !t.legs){
-    const el = document.getElementById('fSizeCalc');
-    el.textContent = dynSize + ' USDT';
-    el.style.color = 'var(--green)';
-    currentFormSize = parseFloat(dynSize) || 0;
-  } else {
-    updateSizeCalc();
-  }
+  updateSizeCalc();
+  draftSig = tradeSig(t);
+  if(skipDraft) document.getElementById('draftNote').classList.remove('show');
+  else restoreDraftIfAny();
   document.getElementById('detailOverlay').classList.remove('open');
   document.getElementById('tradeModal').classList.add('open');
 }
 
 function clearForm(){
-  ['fCoin','fDateIn','fDateOut','fEntry','fStop','fTake','fExit','fLeverage','fSizePct','fPnl','fReason','fNotes']
+  ['fCoin','fDateIn','fDateOut','fEntry','fStop','fTake','fExit','fLeverage','fSizePct','fVolume','fPnl','fReason','fNotes']
     .forEach(id=>{ document.getElementById(id).value=''; });
   document.getElementById('fSizeCalc').textContent = '— USDT';
+  document.getElementById('fSizeSub').textContent = '';
   currentFormSize = 0;
   document.getElementById('fDir').value = 'LONG';
   comboLegs = [];
@@ -1394,9 +1490,8 @@ function closeModal(){
 document.getElementById('addTradeBtn').addEventListener('click', openAdd);
 document.getElementById('modalClose').addEventListener('click', closeModal);
 document.getElementById('modalCancel').addEventListener('click', closeModal);
-document.getElementById('tradeModal').addEventListener('click', e=>{
-  if(e.target === document.getElementById('tradeModal')) closeModal();
-});
+// клик по тёмному фону окно сделки НЕ закрывает: из-за этого терялись данные,
+// когда выделяешь текст и отпускаешь мышь за пределами окна
 
 document.querySelectorAll('#emotionPicker .emotion-btn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
@@ -1438,7 +1533,7 @@ document.getElementById('modalSave').addEventListener('click', async ()=>{
 
   if(formMode === 'combo'){
     const legs = comboLegs
-      .map(l => ({ ...l, coin: (l.coin || '').trim().toUpperCase() }))
+      .map(l => ({ ...l, coin: (l.coin || '').trim().toUpperCase(), pnl: normNum(l.pnl) }))
       .filter(l => l.coin);
     if(legs.length < 2){ alert('В комбинации нужно минимум две монеты'); return; }
     const kind = comboKind();
@@ -1458,8 +1553,10 @@ document.getElementById('modalSave').addEventListener('click', async ()=>{
       entry:'', exitPrice:'', stop:'', take:'', leverage:'', sizePct:'',
     };
     if(editIdx !== null){ trades[editIdx] = trade; } else { trades.unshift(trade); }
+    const pending = collectDraft();
     closeModal(); renderTable(); renderStats(); renderBalance();
-    await save();
+    if(await save()) clearDraft();
+    else { try{ localStorage.setItem(DRAFT_KEY, JSON.stringify(pending)); }catch(e){} alert('Сделка не сохранилась в базу. Данные остались в черновике — открой «+ Сделка» или ✏ ещё раз.'); }
     return;
   }
 
@@ -1475,8 +1572,9 @@ document.getElementById('modalSave').addEventListener('click', async ()=>{
     take:      document.getElementById('fTake').value,
     exitPrice: document.getElementById('fExit').value,
     leverage:  document.getElementById('fLeverage').value,
-    sizePct:    document.getElementById('fSizePct').value,
-    pnl:       document.getElementById('fPnl').value,
+    volume:     document.getElementById('fVolume').value,
+    sizePct:    document.getElementById('fVolume').value ? '' : document.getElementById('fSizePct').value,
+    pnl:       normNum(document.getElementById('fPnl').value),
     reason:    document.getElementById('fReason').value.trim(),
     emotion:     selectedEmotions.join(', '),
     emotionExit: selectedExitEmotions.join(', '),
@@ -1484,13 +1582,15 @@ document.getElementById('modalSave').addEventListener('click', async ()=>{
     screenshots: common.screenshots,
   };
   if(common.costs) trade.costs = common.costs;
+  const pending = collectDraft();
   if(editIdx !== null){ trades[editIdx] = trade; }
   else { trades.unshift(trade); }
   closeModal();
   renderTable();
   renderStats();
   renderBalance();
-  await save();
+  if(await save()) clearDraft();
+  else { try{ localStorage.setItem(DRAFT_KEY, JSON.stringify(pending)); }catch(e){} alert('Сделка не сохранилась в базу. Данные остались в черновике — открой «+ Сделка» или ✏ ещё раз.'); }
 });
 
 // --- Delete ---
@@ -1595,12 +1695,25 @@ function resetUpload(){
 function updateSizeCalc(){
   const pct = parseFloat(document.getElementById('fSizePct').value) || 0;
   const lev = parseFloat(document.getElementById('fLeverage').value) || 0;
+  const vol = parseFloat(document.getElementById('fVolume').value) || 0;
+  const entry = parseFloat(document.getElementById('fEntry').value) || 0;
+  const sub = document.getElementById('fSizeSub');
   // баланс на дату входа (при редактировании саму сделку не учитываем)
   const dateIn = document.getElementById('fDateIn').value;
   const bal = dateIn
     ? calcBalanceAtDate(dateIn, editIdx === null ? undefined : editIdx)
     : (editIdx === null ? balanceAtOpen : calcBalance());
   const el = document.getElementById('fSizeCalc');
+  if(vol > 0 && entry > 0){
+    const size = vol * entry;
+    el.textContent = size.toFixed(2) + ' USDT';
+    el.style.color = 'var(--green)';
+    currentFormSize = +size.toFixed(2);
+    const dp = depoPct(size, lev, bal);
+    sub.textContent = lev > 0 ? `маржа ${(size/lev).toFixed(2)} USDT${dp ? ' · ' + dp.toFixed(1) + '% депозита' : ''}` : 'укажи плечо, чтобы посчитать маржу';
+    return;
+  }
+  sub.textContent = pct > 0 ? `по старому расчёту: ${pct}% депозита` : '';
   if(pct > 0 && lev > 0 && bal > 0){
     const size = (bal * pct / 100 * lev).toFixed(2);
     el.textContent = size + ' USDT';
@@ -1766,7 +1879,8 @@ document.addEventListener('mousemove', e=>{
 
 
 // position calc listeners
-document.getElementById('fSizePct').addEventListener('input', updateSizeCalc);
+document.getElementById('fVolume').addEventListener('input', updateSizeCalc);
+document.getElementById('fEntry').addEventListener('input', updateSizeCalc);
 document.getElementById('fLeverage').addEventListener('input', updateSizeCalc);
 document.getElementById('fDateIn').addEventListener('change', updateSizeCalc);
 
