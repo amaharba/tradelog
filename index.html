@@ -4,8 +4,34 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Торговый журнал</title>
+<script>
+  try{ if(localStorage.getItem('tradelog-theme') === 'dark') document.documentElement.dataset.theme = 'dark'; }catch(e){}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,600&display=swap" rel="stylesheet">
 <style>
+  /* СВЕТЛАЯ ТЕМА (по умолчанию) */
   :root{
+    --bg: #F3F5F7;
+    --surface: #FFFFFF;
+    --surface2: #EEF1F4;
+    --border: #DDE2E8;
+    --text: #151820;
+    --text-soft: #687180;
+    --text-muted: #A0A7B4;
+    --green: #009B74;
+    --green-soft: #DDF3EC;
+    --red: #E0334F;
+    --red-soft: #FCE6EA;
+    --blue: #2563EB;
+    --blue-soft: #E3ECFD;
+    --gold: #C98100;
+    --on-green: #FFFFFF;
+    --tooltip: #FFFFFF;
+    --radius: 8px;
+  }
+  /* ТЁМНАЯ ТЕМА */
+  html[data-theme="dark"]{
     --bg: #0D0F12;
     --surface: #151820;
     --surface2: #1C2030;
@@ -20,7 +46,8 @@
     --blue: #3B82F6;
     --blue-soft: #0F1E3A;
     --gold: #F5A623;
-    --radius: 8px;
+    --on-green: #000000;
+    --tooltip: #1e2230;
   }
   *{ box-sizing:border-box; margin:0; padding:0; }
   body{
@@ -78,7 +105,7 @@
     cursor:pointer; border:none; transition: opacity .15s;
   }
   .btn:hover{ opacity:.85; }
-  .btn-primary{ background:var(--green); color:#000; }
+  .btn-primary{ background:var(--green); color:var(--on-green); }
   .btn-ghost{ background:var(--surface2); color:var(--text); border:1px solid var(--border); }
   .btn-danger{ background:transparent; color:var(--red); border:1px solid var(--red); font-size:12px; padding:6px 12px; }
 
@@ -112,6 +139,45 @@
   }
   .direction.long{ background:var(--green-soft); color:var(--green); }
   .direction.short{ background:var(--red-soft); color:var(--red); }
+  .direction.hedge{ background:var(--blue-soft); color:var(--blue); }
+  .combo-tag{ display:block; font-size:9px; font-weight:700; letter-spacing:.06em; color:var(--text-soft); margin-bottom:3px; }
+  .combo-toggle{ background:none; border:none; color:var(--text-soft); cursor:pointer; font-size:11px; padding:0 6px 0 0; font-family:inherit; }
+  .combo-toggle:hover{ color:var(--text); }
+  tr.leg-row td{ background:var(--surface2); font-size:12px; padding-top:7px !important; padding-bottom:7px !important; }
+  tr.leg-row td:first-child{ border-left:3px solid var(--blue); }
+
+  /* режим формы: одна монета / комбинация */
+  .mode-switch{ display:flex; gap:4px; background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius); padding:3px; margin-bottom:16px; }
+  .mode-switch button{ flex:1; border:none; background:none; padding:8px; border-radius:6px; font-family:inherit; font-size:13px; font-weight:600; color:var(--text-soft); cursor:pointer; }
+  .mode-switch button.active{ background:var(--surface); color:var(--text); box-shadow:0 1px 3px rgba(0,0,0,.15); }
+  .modal.wide{ max-width:760px; }
+  .legs{ display:flex; flex-direction:column; gap:10px; }
+  .leg{ border:1px solid var(--border); border-radius:var(--radius); padding:10px 12px 12px; background:var(--bg); }
+  .leg-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; font-size:12px; font-weight:600; color:var(--text-soft); }
+  .leg-head .leg-size{ font-weight:500; margin-left:10px; color:var(--green); }
+  .leg-del{ background:none; border:1px solid var(--border); border-radius:6px; color:var(--text-soft); cursor:pointer; font-size:11px; padding:3px 8px; font-family:inherit; }
+  .leg-del:hover{ color:var(--red); border-color:var(--red); }
+  .leg-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:8px; }
+  .leg .field input, .leg .field select{ background:var(--surface); }
+  .leg-grid .field label{ font-size:10px; }
+  .leg-add{ background:none; border:1px dashed var(--border); border-radius:var(--radius); color:var(--text-soft); cursor:pointer; padding:9px; font-family:inherit; font-size:13px; font-weight:600; width:100%; }
+  .leg-add:hover{ color:var(--green); border-color:var(--green); }
+  .combo-total{ display:flex; flex-wrap:wrap; gap:6px 18px; justify-content:space-between; align-items:center; background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius); padding:10px 14px; font-size:13px; }
+  .combo-total b{ font-size:15px; }
+  .combo-hint{ font-size:12px; color:var(--gold); margin-top:6px; }
+
+  /* баннер «нет связи с базой» */
+  .offline-banner{ display:none; background:var(--red-soft); color:var(--red); border-bottom:1px solid var(--red); padding:10px 24px; font-size:13px; font-weight:500; align-items:center; gap:14px; flex-wrap:wrap; }
+  .offline-banner.show{ display:flex; }
+  .offline-banner button{ background:var(--red); color:#fff; border:none; border-radius:6px; padding:5px 12px; font-family:inherit; font-size:12px; font-weight:600; cursor:pointer; }
+
+  /* меню бэкапа */
+  .backup-wrap{ position:relative; }
+  .backup-menu{ display:none; position:absolute; right:0; top:calc(100% + 8px); z-index:60; background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.18); padding:6px; min-width:250px; }
+  .backup-menu.open{ display:block; }
+  .backup-menu button{ display:block; width:100%; text-align:left; background:none; border:none; color:var(--text); font-family:inherit; font-size:13px; padding:9px 10px; border-radius:6px; cursor:pointer; }
+  .backup-menu button:hover{ background:var(--surface2); }
+  .backup-menu .note{ font-size:11px; color:var(--text-soft); padding:6px 10px 4px; line-height:1.4; }
   .pnl{ font-weight:700; font-size:14px; }
   .pnl.pos{ color:var(--green); }
   .pnl.neg{ color:var(--red); }
@@ -130,7 +196,7 @@
   .clip-tooltip{
     display:none;
     position:fixed;
-    background:#1e2230;
+    background:var(--tooltip);
     border:1px solid var(--border);
     color:var(--text);
     font-size:13px;
@@ -197,6 +263,7 @@
     border-radius:6px; padding:7px 14px; cursor:pointer;
     color:var(--text-soft); transition:all .15s;
   }
+  .emotion-break{ flex-basis:100%; height:0; }
   .emotion-btn:hover{ border-color:var(--text-soft); color:var(--text); }
   .emotion-btn.selected{ border-color:var(--green); background:var(--green-soft); color:var(--green); }
   .emotion-btn.exit-btn.selected{ border-color:var(--blue); background:var(--blue-soft); color:var(--blue); }
@@ -295,6 +362,97 @@
     .toolbar{ padding:10px 16px; }
     .table-wrap{ padding:0 12px 24px; }
   }
+  /* КНОПКА ТЕМЫ */
+  .theme-btn{ width:38px; height:36px; padding:0; font-size:16px; line-height:1; }
+
+  /* КНИГА ТРЕЙДЕРА — всегда светлая */
+  .book, .bk-modal-bg, .bk-lightbox{
+    --paper:#F7F8F6; --side:#ECEFEB; --ink:#1B1F1D; --ink-soft:#5C635F; --rule:#DCE1DC;
+    --accent:#0A8A68; --accent-soft:#DDF0E8;
+  }
+  .book{
+    position:fixed; inset:0; z-index:150; display:none; grid-template-columns:clamp(240px, 17vw, 320px) 1fr;
+    background:var(--paper); color:var(--ink); font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  }
+  .book.open{ display:grid; }
+  .book-side{ background:var(--side); border-right:1px solid var(--rule); padding:22px 16px; display:flex; flex-direction:column; gap:18px; overflow-y:auto; }
+  .book-back{ background:none; border:none; font:inherit; font-size:13px; color:var(--ink-soft); cursor:pointer; text-align:left; padding:4px 6px; }
+  .book-back:hover{ color:var(--ink); }
+  .book-title{ font-family:'Literata',Georgia,serif; font-size:clamp(24px, 1.6vw, 32px); font-weight:600; line-height:1.15; padding:0 6px; }
+  .book-search{ width:100%; font:inherit; font-size:13px; padding:9px 12px; border:1px solid var(--rule); border-radius:8px; background:#fff; color:var(--ink); }
+  .book-search:focus{ outline:2px solid var(--accent); outline-offset:-1px; }
+  .book-sections{ display:flex; flex-direction:column; gap:2px; }
+  .book-sec{ display:flex; justify-content:space-between; align-items:center; background:none; border:none; font:inherit; font-size:clamp(14px, 0.85vw, 16px); color:var(--ink); padding:9px 10px; border-radius:8px; cursor:pointer; text-align:left; }
+  .book-sec:hover{ background:rgba(0,0,0,.04); }
+  .book-sec.active{ background:var(--accent-soft); color:var(--accent); font-weight:600; }
+  .book-sec .count{ font-size:12px; color:var(--ink-soft); font-weight:400; }
+  .book-sec.active .count{ color:var(--accent); }
+  .book-status{ font-size:12px; color:var(--ink-soft); padding:0 6px; margin-top:auto; }
+
+  .book-main{ overflow-y:auto; padding:clamp(32px, 4vw, 72px) clamp(24px, 5vw, 96px) 96px; }
+  .book-page{ width:100%; max-width:min(1000px, 100%); margin:0 auto; }
+  .book-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:20px; padding-bottom:22px; border-bottom:1px solid var(--rule); margin-bottom:8px; }
+  .book-head h1{ font-family:'Literata',Georgia,serif; font-size:clamp(34px, 2.6vw, 50px); font-weight:600; line-height:1.1; letter-spacing:-.01em; }
+  .book-head p{ color:var(--ink-soft); margin-top:10px; font-size:clamp(15px, 0.95vw, 18px); }
+  .book-head-btns{ display:flex; gap:8px; align-items:center; flex-shrink:0; }
+  .book-head-btns .book-tool{ padding:8px 12px; font-size:13px; }
+  .book-head-form{ display:flex; flex-direction:column; gap:10px; width:100%; }
+  .book-head-form input{ width:100%; font:inherit; border:1px solid var(--rule); border-radius:8px; background:#fff; color:var(--ink); padding:8px 12px; }
+  .book-head-form input:focus{ outline:2px solid var(--accent); outline-offset:-1px; }
+  .book-head-form input.err{ border-color:#C62F47; }
+  #bkHeadName{ font-family:'Literata',Georgia,serif; font-size:30px; font-weight:600; }
+  #bkHeadDesc{ font-size:15px; color:var(--ink-soft); }
+  .book-head-actions{ display:flex; gap:8px; }
+  .book-add{ background:var(--ink); color:#fff; border:none; font:inherit; font-size:13px; font-weight:600; padding:9px 16px; border-radius:8px; cursor:pointer; white-space:nowrap; }
+  .book-add:hover{ background:#000; }
+
+  .book-entry{ padding:clamp(28px, 2.2vw, 40px) 0; border-bottom:1px solid var(--rule); position:relative; }
+  .book-entry h2{ font-family:'Literata',Georgia,serif; font-size:clamp(22px, 1.45vw, 28px); font-weight:600; line-height:1.3; margin-bottom:10px; padding-right:150px; }
+  .book-entry .text{ font-family:'Literata',Georgia,serif; font-size:clamp(17px, 1.1vw, 21px); line-height:1.75; white-space:pre-wrap; }
+  .book-entry figure{ margin-top:18px; display:flex; flex-direction:column; gap:12px; }
+  .book-entry figure img{ display:block; max-width:100%; border-radius:6px; border:1px solid var(--rule); cursor:zoom-in; background:#fff; }
+  .book-entry .meta{ margin-top:12px; font-size:12px; color:var(--ink-soft); }
+  .book-tools{ position:absolute; top:clamp(28px, 2.2vw, 40px); right:0; display:flex; gap:4px; opacity:.45; transition:opacity .15s; }
+  .book-entry:hover .book-tools, .book-entry:focus-within .book-tools{ opacity:1; }
+  .book-tool{ background:none; border:1px solid var(--rule); border-radius:6px; font:inherit; font-size:12px; color:var(--ink-soft); padding:4px 8px; cursor:pointer; }
+  .book-tool:hover{ color:var(--ink); border-color:var(--ink-soft); }
+  .book-tool.del:hover{ color:#C62F47; border-color:#C62F47; }
+  .book-empty{ padding:50px 0; color:var(--ink-soft); font-size:15px; }
+  .book mark{ background:#FFE9A8; color:inherit; padding:0 1px; }
+
+  .bk-modal-bg{ position:fixed; inset:0; background:rgba(20,25,22,.45); z-index:220; display:none; align-items:center; justify-content:center; padding:20px; }
+  .bk-modal-bg.open{ display:flex; }
+  .bk-modal{ background:#fff; color:#1B1F1D; border-radius:12px; width:100%; max-width:600px; max-height:90vh; overflow-y:auto; padding:24px; display:flex; flex-direction:column; gap:14px; font-family:'Inter',-apple-system,sans-serif; }
+  .bk-modal h3{ font-family:'Literata',Georgia,serif; font-size:22px; font-weight:600; }
+  .bk-modal label{ font-size:12px; font-weight:600; color:#5C635F; display:block; margin-bottom:6px; }
+  .bk-modal input, .bk-modal textarea, .bk-modal select{ width:100%; font:inherit; font-size:14px; padding:10px 12px; border:1px solid #DCE1DC; border-radius:8px; color:#1B1F1D; background:#fff; }
+  .bk-modal textarea{ min-height:180px; resize:vertical; font-family:'Literata',Georgia,serif; font-size:15px; line-height:1.6; }
+  .bk-modal input.err{ border-color:#C62F47; }
+  .bk-drop{ border:1.5px dashed #C9D0CA; border-radius:8px; padding:16px; text-align:center; color:#5C635F; font-size:13px; cursor:pointer; }
+  .bk-drop:hover, .bk-drop.over{ border-color:#0A8A68; color:#0A8A68; }
+  .bk-thumbs{ display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:8px; margin-top:8px; }
+  .bk-thumb{ position:relative; }
+  .bk-thumb img{ width:100%; height:90px; object-fit:cover; border-radius:6px; border:1px solid #DCE1DC; display:block; }
+  .bk-thumb button{ position:absolute; top:4px; right:4px; background:rgba(0,0,0,.65); color:#fff; border:none; border-radius:4px; width:22px; height:22px; cursor:pointer; font-size:12px; }
+  .bk-upload-msg{ font-size:12px; color:#5C635F; margin-top:6px; min-height:16px; }
+  .bk-foot{ display:flex; justify-content:flex-end; gap:8px; }
+  .bk-cancel{ background:#ECEFEB; color:#1B1F1D; border:none; font:inherit; font-weight:600; font-size:13px; padding:9px 16px; border-radius:8px; cursor:pointer; }
+
+  .bk-lightbox{ position:fixed; inset:0; background:rgba(10,12,11,.9); z-index:300; display:none; align-items:center; justify-content:center; padding:30px; cursor:zoom-out; }
+  .bk-lightbox.open{ display:flex; }
+  .bk-lightbox img{ max-width:100%; max-height:100%; border-radius:6px; background:#fff; }
+
+  @media (max-width:760px){
+    .book{ grid-template-columns:1fr; grid-template-rows:auto 1fr; }
+    .book-side{ border-right:none; border-bottom:1px solid var(--rule); padding:14px; gap:10px; }
+    .book-sections{ flex-direction:row; overflow-x:auto; }
+    .book-sec{ white-space:nowrap; }
+    .book-sec .count{ margin-left:6px; }
+    .book-status{ display:none; }
+    .book-main{ padding:24px 18px 60px; }
+    .book-head h1{ font-size:30px; }
+    .book-tools{ opacity:1; }
+  }
 </style>
 </head>
 <body>
@@ -310,6 +468,17 @@
     </div>
   </div>
   <div class="header-right">
+    <button class="btn btn-ghost theme-btn" id="themeBtn" title="Тёмная тема">☾</button>
+    <div class="backup-wrap">
+      <button class="btn btn-ghost" id="backupBtn" title="Резервная копия">Бэкап</button>
+      <div class="backup-menu" id="backupMenu">
+        <button id="backupDownload">⬇ Скачать бэкап (.json)</button>
+        <button id="backupRestore">⬆ Восстановить из файла</button>
+        <input type="file" id="backupFile" accept=".json,application/json" hidden>
+        <div class="note" id="backupNote">Сделки, баланс и книга одним файлом.</div>
+      </div>
+    </div>
+    <button class="btn btn-ghost" id="openBookBtn">Книга трейдера</button>
     <div class="balance-block" id="balanceBlock">
       <div class="balance-label">БАЛАНС</div>
       <div class="balance-value" id="balanceValue">—</div>
@@ -317,6 +486,10 @@
     </div>
     <button class="btn btn-primary" id="addTradeBtn">+ Сделка</button>
   </div>
+</div>
+<div class="offline-banner" id="offlineBanner">
+  <span id="offlineText">Нет связи с базой.</span>
+  <button id="offlineRetry">Повторить</button>
 </div>
 
 <!-- BALANCE DROPDOWN -->
@@ -374,6 +547,7 @@
     <option value="">Все направления</option>
     <option value="LONG">LONG</option>
     <option value="SHORT">SHORT</option>
+    <option value="HEDGE">Хедж</option>
   </select>
   <select class="filter-select" id="filterResult">
     <option value="">Все результаты</option>
@@ -419,12 +593,24 @@
       <button class="modal-close" id="modalClose">✕</button>
     </div>
     <div class="modal-body">
+      <div class="mode-switch" id="modeSwitch">
+        <button type="button" data-mode="single" class="active">Одна монета</button>
+        <button type="button" data-mode="combo">Комбинация</button>
+      </div>
       <div class="field-group">
-        <div class="field">
+        <div class="field full combo-only" style="display:none">
+          <label>Тип комбинации</label>
+          <select id="fComboType">
+            <option value="basket-LONG">Корзина LONG — несколько монет в лонг</option>
+            <option value="basket-SHORT">Корзина SHORT — несколько монет в шорт</option>
+            <option value="hedge">Хедж — лонг и шорт одновременно</option>
+          </select>
+        </div>
+        <div class="field single-only">
           <label>Монета</label>
           <input type="text" id="fCoin" placeholder="BTC, ETH, SOL…">
         </div>
-        <div class="field">
+        <div class="field single-only">
           <label>Направление</label>
           <select id="fDir">
             <option value="LONG">LONG</option>
@@ -439,37 +625,44 @@
           <label>Дата выхода</label>
           <input type="date" id="fDateOut">
         </div>
-        <div class="field">
+        <div class="field single-only">
           <label>Цена входа</label>
           <input type="number" id="fEntry" placeholder="0.00" step="any">
         </div>
-        <div class="field">
+        <div class="field single-only">
           <label>Цена выхода</label>
           <input type="number" id="fExit" placeholder="0.00" step="any">
         </div>
-        <div class="field">
+        <div class="field single-only">
           <label>Стоп-лосс</label>
           <input type="number" id="fStop" placeholder="0.00" step="any">
         </div>
-        <div class="field">
+        <div class="field single-only">
           <label>Тейк-профит</label>
           <input type="number" id="fTake" placeholder="0.00" step="any">
         </div>
-        <div class="field">
+        <div class="field single-only">
           <label>Плечо (×)</label>
           <input type="number" id="fLeverage" placeholder="10" min="1">
         </div>
-        <div class="field">
+        <div class="field single-only">
           <label>% от депозита</label>
           <input type="number" id="fSizePct" placeholder="5" step="any" min="0" max="100">
         </div>
-        <div class="field full" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;">
+        <div class="field full single-only" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;">
           <span style="font-size:12px;color:var(--text-soft)">Размер позиции (депозит × % × плечо)</span>
           <span id="fSizeCalc" style="font-size:16px;font-weight:700;color:var(--green)">— USDT</span>
         </div>
-        <div class="field full">
+        <div class="field full single-only">
           <label>P&L (USDT)</label>
           <input type="number" id="fPnl" placeholder="+25.00" step="any">
+        </div>
+        <div class="field full combo-only" style="display:none">
+          <label>Монеты</label>
+          <div class="legs" id="legs"></div>
+          <button type="button" class="leg-add" id="legAdd">+ монета</button>
+          <div class="combo-total" id="comboTotal"></div>
+          <div class="combo-hint" id="comboHint"></div>
         </div>
       </div>
       <div class="field">
@@ -482,12 +675,16 @@
           <button class="emotion-btn" data-val="Спокойно">Спокойно</button>
           <button class="emotion-btn" data-val="Уверенно">Уверенно</button>
           <button class="emotion-btn" data-val="Лёгкость">Лёгкость</button>
+          <button class="emotion-btn" data-val="Надежда">Надежда</button>
+          <button class="emotion-btn" data-val="Сомнение">Сомнение</button>
+          <div class="emotion-break"></div>
+          <button class="emotion-btn" data-val="Неуверенно">Неуверенно</button>
           <button class="emotion-btn" data-val="Жадность">Жадность</button>
           <button class="emotion-btn" data-val="Страх">Страх</button>
           <button class="emotion-btn" data-val="FOMO">FOMO</button>
           <button class="emotion-btn" data-val="Азарт">Азарт</button>
-          <button class="emotion-btn" data-val="Сомнение">Сомнение</button>
           <button class="emotion-btn" data-val="Усталость">Усталость</button>
+          <button class="emotion-btn" data-val="Отчаяние">Отчаяние</button>
         </div>
       </div>
       <div class="field">
@@ -496,12 +693,16 @@
           <button class="emotion-btn exit-btn" data-val="Спокойно">Спокойно</button>
           <button class="emotion-btn exit-btn" data-val="Уверенно">Уверенно</button>
           <button class="emotion-btn exit-btn" data-val="Лёгкость">Лёгкость</button>
+          <button class="emotion-btn exit-btn" data-val="Надежда">Надежда</button>
+          <button class="emotion-btn exit-btn" data-val="Сомнение">Сомнение</button>
+          <div class="emotion-break"></div>
+          <button class="emotion-btn exit-btn" data-val="Неуверенно">Неуверенно</button>
           <button class="emotion-btn exit-btn" data-val="Жадность">Жадность</button>
           <button class="emotion-btn exit-btn" data-val="Страх">Страх</button>
           <button class="emotion-btn exit-btn" data-val="FOMO">FOMO</button>
           <button class="emotion-btn exit-btn" data-val="Азарт">Азарт</button>
-          <button class="emotion-btn exit-btn" data-val="Сомнение">Сомнение</button>
           <button class="emotion-btn exit-btn" data-val="Усталость">Усталость</button>
+          <button class="emotion-btn exit-btn" data-val="Отчаяние">Отчаяние</button>
         </div>
       </div>
       <div class="field">
@@ -585,6 +786,40 @@
   </div>
 </div>
 
+<!-- КНИГА ТРЕЙДЕРА -->
+<div class="book" id="book">
+  <aside class="book-side">
+    <button class="book-back" id="closeBookBtn">← К журналу</button>
+    <div class="book-title">Книга трейдера</div>
+    <input class="book-search" id="bookSearch" placeholder="Поиск по книге">
+    <nav class="book-sections" id="bookSections"></nav>
+    <div class="book-status" id="bookStatus"></div>
+  </aside>
+  <main class="book-main"><div class="book-page" id="bookPage"></div></main>
+</div>
+
+<div class="bk-modal-bg" id="bkModalBg">
+  <div class="bk-modal">
+    <h3 id="bkModalTitle">Новая запись</h3>
+    <div><label for="bkSec">Раздел</label><select id="bkSec"></select></div>
+    <div><label for="bkTitle">Заголовок</label><input id="bkTitle" placeholder="Не торгую посередине диапазона"></div>
+    <div><label for="bkText">Текст</label><textarea id="bkText" placeholder="Своими словами: что, почему и что будет, если нарушить"></textarea></div>
+    <div>
+      <label>Скрины графика (необязательно)</label>
+      <div class="bk-drop" id="bkDrop">Нажми, перетащи файл или вставь скрин через Ctrl+V</div>
+      <input type="file" id="bkFile" accept="image/*" multiple hidden>
+      <div class="bk-thumbs" id="bkThumbs"></div>
+      <div class="bk-upload-msg" id="bkUploadMsg"></div>
+    </div>
+    <div class="bk-foot">
+      <button class="bk-cancel" id="bkCancel">Отмена</button>
+      <button class="book-add" id="bkSave">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<div class="bk-lightbox" id="bkLightbox"></div>
+
 <script>
 // --- Supabase ---
 const SB_URL = 'https://ifrtyfypzpfuwzzistfg.supabase.co';
@@ -597,16 +832,46 @@ const SB_HEADERS = {
 
 async function sbGet(key){
   const res = await fetch(`${SB_URL}/rest/v1/tradelog?key=eq.${key}&select=value`, { headers: SB_HEADERS });
+  if(!res.ok) throw new Error('HTTP ' + res.status);
   const data = await res.json();
+  if(!Array.isArray(data)) throw new Error('Неожиданный ответ базы');
   return data.length ? data[0].value : null;
 }
 
 async function sbSet(key, value){
-  await fetch(`${SB_URL}/rest/v1/tradelog`, {
+  const res = await fetch(`${SB_URL}/rest/v1/tradelog`, {
     method: 'POST',
     headers: { ...SB_HEADERS, 'Prefer': 'resolution=merge-duplicates' },
     body: JSON.stringify({ key, value })
   });
+  if(!res.ok) throw new Error('HTTP ' + res.status);
+}
+
+// ---------- локальная копия в браузере ----------
+function localSave(part, data){
+  try{ localStorage.setItem('tradelog-copy-' + part, JSON.stringify({ at: Date.now(), data })); }catch(e){}
+}
+function localLoad(part){
+  try{ const v = localStorage.getItem('tradelog-copy-' + part); return v ? JSON.parse(v) : null; }catch(e){ return null; }
+}
+function fmtStamp(ms){
+  const d = new Date(ms);
+  const p = n => String(n).padStart(2,'0');
+  return `${p(d.getDate())}.${p(d.getMonth()+1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+// ---------- связь с базой ----------
+let tradesOk = false, balanceOk = false;
+function showOffline(copyAt){
+  document.getElementById('offlineText').textContent = copyAt
+    ? `Нет связи с базой Supabase. Показана копия из браузера от ${fmtStamp(copyAt)}. Сохранение отключено, чтобы не затереть данные.`
+    : 'Нет связи с базой Supabase. Сохранение отключено, чтобы не затереть данные. Проверь проект в Supabase.';
+  document.getElementById('offlineBanner').classList.add('show');
+}
+function dbGuard(){
+  if(tradesOk && balanceOk) return true;
+  alert('Нет связи с базой Supabase, поэтому сохранение отключено — иначе можно затереть данные. Проверь проект в Supabase и нажми «Повторить» в красной полосе сверху.');
+  return false;
 }
 
 let trades = [];
@@ -623,10 +888,15 @@ async function load(){
     const val = await sbGet('trades');
     trades = val ? JSON.parse(val) : [];
     if(!Array.isArray(trades)) trades = [];
+    tradesOk = true;
+    localSave('trades', trades);
     setStatus('Синхронизировано', true);
   }catch(e){
-    setStatus('', true);
-    trades = [];
+    tradesOk = false;
+    const copy = localLoad('trades');
+    trades = copy && Array.isArray(copy.data) ? copy.data : [];
+    setStatus('Нет связи с базой', false);
+    showOffline(copy && copy.at);
   }
   renderTable();
   renderStats();
@@ -634,9 +904,11 @@ async function load(){
 }
 
 async function save(){
+  if(!tradesOk){ setStatus('Не сохранено: нет связи с базой', false); return; }
   setStatus('Сохранение…', false);
   try{
     await sbSet('trades', JSON.stringify(trades));
+    localSave('trades', trades);
     setStatus('Сохранено ✓', true);
     setTimeout(()=>{ if(document.getElementById('statusMsg').textContent === 'Сохранено ✓') setStatus('', true); }, 2000);
   }catch(e){
@@ -680,6 +952,21 @@ function getFiltered(){
   });
 }
 
+const expandedCombos = new Set();
+function escHtml(v){ return String(v ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function dirBadge(t){
+  if(Array.isArray(t.legs) && t.legs.length){
+    if(t.combo === 'hedge') return `<span class="combo-tag">ХЕДЖ · ${t.legs.length}</span><span class="direction hedge">L + S</span>`;
+    return `<span class="combo-tag">КОРЗИНА · ${t.legs.length}</span><span class="direction ${(t.direction||'').toLowerCase()}">${t.direction}</span>`;
+  }
+  return `<span class="direction ${(t.direction||'').toLowerCase()}">${t.direction || '—'}</span>`;
+}
+function comboLeverage(t){
+  const levs = [...new Set(t.legs.map(l => parseFloat(l.leverage)).filter(x => x > 0))].sort((a,b)=>a-b);
+  if(!levs.length) return '×—';
+  return levs.length === 1 ? '×' + levs[0] : '×' + levs[0] + '–' + levs[levs.length-1];
+}
+
 function renderTable(){
   const filtered = getFiltered();
   const body = document.getElementById('tableBody');
@@ -690,15 +977,17 @@ function renderTable(){
     const realIdx = trades.indexOf(t);
     const pnl = (parseFloat(t.pnl)||0) - (parseFloat(t.costs)||0);
     const pnlClass = pnl > 0 ? 'pos' : pnl < 0 ? 'neg' : 'zero';
+    const isCombo = Array.isArray(t.legs) && t.legs.length;
+    const open = isCombo && expandedCombos.has(t);
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td style="color:var(--text-muted);font-size:12px">${realIdx+1}</td>
-      <td style="color:var(--text-soft);font-size:12px">${(t.dateIn||'—').replace('2026-','')}${t.dateOut ? ' → ' + t.dateOut.replace('2026-','') : ''}</td>
-      <td><span class="coin">${t.coin || '—'}</span></td>
-      <td><span class="direction ${(t.direction||'').toLowerCase()}">${t.direction || '—'}</span></td>
-      <td style="font-size:13px">${t.entry || '—'}</td>
-      <td style="font-size:13px;color:${t.exitPrice?'var(--text)':'var(--text-muted)'}">${t.exitPrice || '—'}</td>
-      <td style="font-size:13px">×${t.leverage || '—'}</td>
+      <td style="color:var(--text-soft);font-size:12px">${t.dateIn ? fmtDate(t.dateIn) : '—'}${t.dateOut ? ' → ' + fmtDate(t.dateOut) : ''}</td>
+      <td>${isCombo ? `<button class="combo-toggle" data-toggle="${realIdx}" title="Показать монеты">${open ? '▾' : '▸'}</button>` : ''}<span class="coin">${escHtml(t.coin) || '—'}</span></td>
+      <td>${dirBadge(t)}</td>
+      <td style="font-size:13px">${isCombo ? '<span style="color:var(--text-muted)">—</span>' : (t.entry || '—')}</td>
+      <td style="font-size:13px;color:${t.exitPrice?'var(--text)':'var(--text-muted)'}">${isCombo ? '—' : (t.exitPrice || '—')}</td>
+      <td style="font-size:13px">${isCombo ? comboLeverage(t) : '×' + (t.leverage || '—')}</td>
       <td style="font-size:13px">${(()=>{ const s=getTradeSize(t); return s ? s + ' $' : '—'; })()}</td>
       <td><span class="pnl ${pnlClass}">${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} $</span></td>
       <td style="font-size:12px">
@@ -707,8 +996,8 @@ function renderTable(){
         ${t.emotionExit ? `<span style="color:var(--blue)">${t.emotionExit}</span>` : ''}
         ${!t.emotion && !t.emotionExit ? '—' : ''}
       </td>
-      <td class="clip-cell">${t.reason || '—'}${t.reason ? `<div class="clip-tooltip">${t.reason.replace(/</g,'&lt;')}</div>` : ''}</td>
-      <td class="clip-cell">${t.notes || '—'}${t.notes ? `<div class="clip-tooltip">${t.notes.replace(/</g,'&lt;')}</div>` : ''}</td>
+      <td class="clip-cell">${t.reason ? escHtml(t.reason) : '—'}${t.reason ? `<div class="clip-tooltip">${escHtml(t.reason)}</div>` : ''}</td>
+      <td class="clip-cell">${t.notes ? escHtml(t.notes) : '—'}${t.notes ? `<div class="clip-tooltip">${escHtml(t.notes)}</div>` : ''}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px;" data-edit="${realIdx}">✏</button>
         <button class="btn btn-danger" style="margin-left:4px;" data-del="${realIdx}">✕</button>
@@ -719,6 +1008,37 @@ function renderTable(){
       showDetail(realIdx);
     });
     body.appendChild(tr);
+
+    // строки монет комбинации
+    if(open){
+      const bal = t.dateIn ? calcBalanceAtDate(t.dateIn, realIdx) : 0;
+      t.legs.forEach(l=>{
+        const lp = parseFloat(l.pnl) || 0;
+        const sz = legSize(l, bal);
+        const lr = document.createElement('tr');
+        lr.className = 'leg-row';
+        lr.innerHTML = `
+          <td></td><td></td>
+          <td><span class="coin" style="font-size:13px">${escHtml(l.coin) || '—'}</span></td>
+          <td><span class="direction ${(l.direction||'').toLowerCase()}">${l.direction || '—'}</span></td>
+          <td>${l.entry || '—'}</td>
+          <td>${l.exit || '—'}</td>
+          <td>×${l.leverage || '—'}</td>
+          <td>${sz ? sz.toFixed(2) + ' $' : '—'}</td>
+          <td><span class="pnl ${lp>0?'pos':lp<0?'neg':'zero'}" style="font-size:12px">${lp>=0?'+':''}${lp.toFixed(2)} $</span></td>
+          <td colspan="4" style="color:var(--text-soft)">${l.stop ? 'стоп ' + l.stop : ''}${l.stop && l.take ? ' · ' : ''}${l.take ? 'тейк ' + l.take : ''}</td>`;
+        body.appendChild(lr);
+      });
+    }
+  });
+
+  body.querySelectorAll('[data-toggle]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      e.stopPropagation();
+      const t = trades[parseInt(btn.dataset.toggle)];
+      if(expandedCombos.has(t)) expandedCombos.delete(t); else expandedCombos.add(t);
+      renderTable();
+    });
   });
 
   body.querySelectorAll('[data-edit]').forEach(btn=>{
@@ -734,10 +1054,22 @@ function showDetail(idx){
   const t = trades[idx];
   if(!t) return;
   const pnl = parseFloat(t.pnl)||0;
-  document.getElementById('detailTitle').textContent = `${t.coin} ${t.direction}`;
-  const rows = [
-    ['Дата входа', t.dateIn],
-    ['Дата выхода', t.dateOut],
+  const isCombo = Array.isArray(t.legs) && t.legs.length;
+  document.getElementById('detailTitle').textContent = isCombo
+    ? (t.combo === 'hedge' ? 'Хедж' : 'Корзина ' + t.direction) + ' · ' + t.coin
+    : `${t.coin} ${t.direction}`;
+  const rows = isCombo ? [
+    ['Дата входа', fmtDate(t.dateIn, true)],
+    ['Дата выхода', fmtDate(t.dateOut, true)],
+    ['Тип', dirBadge(t)],
+    ['Размер позиции', (()=>{ const s=getTradeSize(t); return s ? s + ' USDT' : '—'; })()],
+    ['Издержки', t.costs ? '−' + parseFloat(t.costs).toFixed(2) + ' $' : '—'],
+    ['P&L (итого)', `<span class="pnl ${pnl>0?'pos':pnl<0?'neg':'zero'}">${pnl>=0?'+':''}${pnl.toFixed(2)} $</span>`],
+    ['Эмоции (вход)', t.emotion || '—'],
+    ['Эмоции (выход)', t.emotionExit || '—'],
+  ] : [
+    ['Дата входа', fmtDate(t.dateIn, true)],
+    ['Дата выхода', fmtDate(t.dateOut, true)],
     ['Направление', `<span class="direction ${(t.direction||'').toLowerCase()}">${t.direction}</span>`],
     ['Цена входа', t.entry],
     ['Стоп-лосс', t.stop],
@@ -752,6 +1084,17 @@ function showDetail(idx){
     ['Эмоции (выход)', t.emotionExit || '—'],
   ];
   let html = rows.map(([l,v])=>`<div class="detail-row"><span class="label">${l}</span><span class="val">${v||'—'}</span></div>`).join('');
+  if(isCombo){
+    const bal = t.dateIn ? calcBalanceAtDate(t.dateIn, idx) : 0;
+    html += `<div class="detail-note" style="margin-top:12px"><div class="label">Монеты</div>${t.legs.map(l=>{
+      const lp = parseFloat(l.pnl)||0; const sz = legSize(l, bal);
+      return `<div style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:8px;font-size:12px;line-height:1.7">
+        <div style="display:flex;justify-content:space-between;align-items:center"><span><b style="font-size:13px">${escHtml(l.coin)}</b> <span class="direction ${(l.direction||'').toLowerCase()}">${l.direction}</span></span>
+        <span class="pnl ${lp>0?'pos':lp<0?'neg':'zero'}">${lp>=0?'+':''}${lp.toFixed(2)} $</span></div>
+        <div style="color:var(--text-soft)">Вход ${l.entry||'—'} · выход ${l.exit||'—'} · стоп ${l.stop||'—'} · тейк ${l.take||'—'}</div>
+        <div style="color:var(--text-soft)">×${l.leverage||'—'} · ${l.sizePct ? l.sizePct + '% депозита' : '% не указан'}${sz ? ' · ' + sz.toFixed(2) + ' USDT' : ''}</div>
+      </div>`; }).join('')}</div>`;
+  }
   if(t.reason) html += `<div class="detail-note"><div class="label">Причина входа</div><div class="val" style="max-height:80px;overflow:hidden;cursor:pointer;position:relative" onclick="this.style.maxHeight=this.style.maxHeight==='none'?'80px':'none'">${t.reason}<div style="position:absolute;bottom:0;left:0;right:0;height:24px;background:linear-gradient(transparent,var(--surface));pointer-events:none"></div></div><span style="font-size:11px;color:var(--green);cursor:pointer" onclick="var v=this.previousElementSibling;v.style.maxHeight=v.style.maxHeight==='none'?'80px':'none';this.textContent=v.style.maxHeight==='none'?'▲ Свернуть':'▼ Читать полностью'">▼ Читать полностью</span></div>`;
   if(t.notes) html += `<div class="detail-note" style="margin-top:12px"><div class="label">Заметки / выводы</div><div class="val" style="max-height:80px;overflow:hidden;cursor:pointer;position:relative" onclick="this.style.maxHeight=this.style.maxHeight==='none'?'80px':'none'">${t.notes}<div style="position:absolute;bottom:0;left:0;right:0;height:24px;background:linear-gradient(transparent,var(--surface));pointer-events:none"></div></div><span style="font-size:11px;color:var(--green);cursor:pointer" onclick="var v=this.previousElementSibling;v.style.maxHeight=v.style.maxHeight==='none'?'80px':'none';this.textContent=v.style.maxHeight==='none'?'▲ Свернуть':'▼ Читать полностью'">▼ Читать полностью</span></div>`;
   const shots = (t.screenshots||[]).filter(Boolean);
@@ -773,31 +1116,188 @@ document.getElementById('detailOverlay').addEventListener('click', e=>{
 });
 
 // --- Modal ---
+// день недели по ISO-дате: "2026-10-31" -> "сб"
+const WEEKDAYS = ['вс','пн','вт','ср','чт','пт','сб'];
+function weekday(iso){
+  const [y,m,d] = (iso||'').split('-').map(Number);
+  if(!y || !m || !d) return '';
+  return WEEKDAYS[new Date(y, m-1, d).getDay()];
+}
+
+// ISO "2026-10-31" -> "31.10 сб" (или "31.10.2026, сб" с годом)
+function fmtDate(iso, withYear){
+  if(!iso) return '';
+  const [y,m,d] = iso.split('-');
+  if(!d) return iso;
+  const wd = weekday(iso);
+  return withYear ? `${d}.${m}.${y}${wd ? ', ' + wd : ''}` : `${d}.${m}${wd ? ' ' + wd : ''}`;
+}
+
+function legSize(leg, bal){
+  const pct = parseFloat(leg.sizePct) || 0;
+  const lev = parseFloat(leg.leverage) || 0;
+  return (pct > 0 && lev > 0 && bal > 0) ? bal * pct / 100 * lev : 0;
+}
+
 function getTradeSize(t){
+  if(Array.isArray(t.legs)){
+    const bal = t.dateIn ? calcBalanceAtDate(t.dateIn, trades.indexOf(t)) : 0;
+    const sum = t.legs.reduce((s, l) => s + legSize(l, bal), 0);
+    return sum > 0 ? sum.toFixed(2) : null;
+  }
   // если есть sizePct и leverage — считаем динамически от баланса на дату входа
   const pct = parseFloat(t.sizePct) || 0;
   const lev = parseFloat(t.leverage) || 0;
   if(pct > 0 && lev > 0 && t.dateIn){
-    const bal = calcBalanceAtDate(t.dateIn);
+    const bal = calcBalanceAtDate(t.dateIn, trades.indexOf(t));
     if(bal > 0) return (bal * pct / 100 * lev).toFixed(2);
   }
   // fallback на сохранённый размер
   return t.size || null;
 }
 
-function calcBalanceAtDate(dateISO){
-  // баланс на начало указанного дня — исключаем сделки открытые в этот день или позже
+function calcBalanceAtDate(dateISO, excludeIdx){
+  // баланс на момент входа: пополнения/выводы до этой даты включительно
+  // + результат сделок, закрытых до входа (за вычетом комиссий).
+  // Сделка, закрытая в день входа, считается закрытой ДО входа,
+  // если её открыли раньше. Сделки, открытые в один день, считаются
+  // одновременными и друг на друга не влияют.
   const opsTotal = balanceOps.reduce((s,op)=>{
+    const opISO = opDateISO(op.date);
+    if(opISO && opISO > dateISO) return s;
     const a = parseFloat(op.amount)||0;
     return s + (op.type === 'withdraw' ? -a : a);
   }, 0);
-  const tradePnlBefore = trades.reduce((s,t)=>{
-    // включаем только сделки, которые ЗАКРЫЛИСЬ ДО этой даты
-    if(t.dateOut && t.dateOut < dateISO) return s + (parseFloat(t.pnl)||0);
+  const tradePnlBefore = trades.reduce((s,t,i)=>{
+    if(i === excludeIdx) return s;
+    const closedBefore = t.dateOut && (
+      t.dateOut < dateISO ||
+      (t.dateOut === dateISO && t.dateIn && t.dateIn < dateISO)
+    );
+    if(closedBefore) return s + (parseFloat(t.pnl)||0) - (parseFloat(t.costs)||0);
     return s;
   }, 0);
   return opsTotal + tradePnlBefore;
 }
+
+// дата операции баланса хранится как "29.10.2026" -> "2026-10-29"
+function opDateISO(d){
+  if(!d) return '';
+  const m = String(d).match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
+}
+
+// ---------- комбинированные сделки ----------
+let formMode = 'single';
+let comboLegs = [];
+let editOldPnl = null;   // общий P&L сделки до перевода в комбинацию
+
+function emptyLeg(dir){ return { coin:'', direction: dir || 'LONG', entry:'', exit:'', stop:'', take:'', leverage:'', sizePct:'', pnl:'' }; }
+function comboKind(){ return document.getElementById('fComboType').value; }  // basket-LONG | basket-SHORT | hedge
+
+function setFormMode(mode){
+  formMode = mode;
+  document.querySelectorAll('#modeSwitch button').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  document.querySelectorAll('#tradeModal .single-only').forEach(el => el.style.display = mode === 'single' ? '' : 'none');
+  document.querySelectorAll('#tradeModal .combo-only').forEach(el => el.style.display = mode === 'combo' ? '' : 'none');
+  document.querySelector('#tradeModal .modal').classList.toggle('wide', mode === 'combo');
+  if(mode === 'combo'){
+    if(!comboLegs.length) seedLegsFromSingle();
+    renderLegs();
+  }
+}
+
+// переносим то, что уже введено в форму одной монеты
+function seedLegsFromSingle(){
+  const dir = document.getElementById('fDir').value;
+  const coins = document.getElementById('fCoin').value.split(/[,+\/;]+/).map(x => x.trim().toUpperCase()).filter(Boolean);
+  const lev = document.getElementById('fLeverage').value;
+  document.getElementById('fComboType').value = dir === 'SHORT' ? 'basket-SHORT' : 'basket-LONG';
+  if(coins.length >= 2){
+    comboLegs = coins.map(c => ({ ...emptyLeg(dir), coin:c, leverage:lev }));
+  } else {
+    comboLegs = [
+      { ...emptyLeg(dir), coin: coins[0] || '',
+        entry: document.getElementById('fEntry').value, exit: document.getElementById('fExit').value,
+        stop: document.getElementById('fStop').value, take: document.getElementById('fTake').value,
+        leverage: lev, sizePct: document.getElementById('fSizePct').value, pnl: document.getElementById('fPnl').value },
+      emptyLeg(dir)
+    ];
+  }
+}
+
+const LEG_FIELDS = [
+  ['coin','Монета','text','ZEC'], ['entry','Вход','number','0.00'], ['exit','Выход','number','0.00'],
+  ['stop','Стоп','number','0.00'], ['take','Тейк','number','0.00'], ['leverage','Плечо ×','number','5'],
+  ['sizePct','% депоз.','number','30'], ['pnl','P&L $','number','+0.00']
+];
+
+function renderLegs(){
+  const hedge = comboKind() === 'hedge';
+  const basketDir = hedge ? null : comboKind().split('-')[1];
+  if(basketDir) comboLegs.forEach(l => l.direction = basketDir);
+  const box = document.getElementById('legs');
+  box.innerHTML = comboLegs.map((l, i) => `
+    <div class="leg">
+      <div class="leg-head"><span>Монета ${i+1}<span class="leg-size" id="legSize${i}"></span></span>
+        ${comboLegs.length > 1 ? `<button type="button" class="leg-del" data-legdel="${i}">Убрать</button>` : ''}</div>
+      <div class="leg-grid">
+        ${LEG_FIELDS.slice(0,1).map(f => legInput(l, i, f)).join('')}
+        ${hedge ? `<div class="field"><label>Направл.</label><select data-leg="${i}" data-f="direction">
+            <option value="LONG" ${l.direction==='LONG'?'selected':''}>LONG</option>
+            <option value="SHORT" ${l.direction==='SHORT'?'selected':''}>SHORT</option></select></div>` : ''}
+        ${LEG_FIELDS.slice(1).map(f => legInput(l, i, f)).join('')}
+      </div>
+    </div>`).join('');
+  box.querySelectorAll('[data-leg]').forEach(el => {
+    const ev = el.tagName === 'SELECT' ? 'change' : 'input';
+    el.addEventListener(ev, () => {
+      comboLegs[+el.dataset.leg][el.dataset.f] = el.dataset.f === 'coin' ? el.value.toUpperCase() : el.value;
+      updateComboTotals();
+    });
+  });
+  box.querySelectorAll('[data-legdel]').forEach(b => b.addEventListener('click', () => {
+    comboLegs.splice(+b.dataset.legdel, 1); renderLegs();
+  }));
+  updateComboTotals();
+}
+function legInput(l, i, [f, label, type, ph]){
+  return `<div class="field"><label>${label}</label><input type="${type}" ${type==='number'?'step="any"':''} placeholder="${ph}" value="${escHtml(l[f])}" data-leg="${i}" data-f="${f}" ${f==='coin'?'style="text-transform:uppercase"':''}></div>`;
+}
+
+function updateComboTotals(){
+  if(formMode !== 'combo') return;
+  const dateIn = document.getElementById('fDateIn').value;
+  const bal = dateIn ? calcBalanceAtDate(dateIn, editIdx === null ? undefined : editIdx) : calcBalance();
+  let size = 0, pnl = 0, pct = 0;
+  comboLegs.forEach((l, i) => {
+    const sz = legSize(l, bal);
+    size += sz; pnl += parseFloat(l.pnl) || 0; pct += parseFloat(l.sizePct) || 0;
+    const el = document.getElementById('legSize' + i);
+    if(el) el.textContent = sz ? '· ' + sz.toFixed(2) + ' USDT' : '';
+  });
+  const pc = pnl > 0 ? 'var(--green)' : pnl < 0 ? 'var(--red)' : 'var(--text-soft)';
+  document.getElementById('comboTotal').innerHTML = `
+    <span>Позиция: <b>${size ? size.toFixed(2) + ' USDT' : '—'}</b></span>
+    <span>Депозит: <b style="color:${pct > 100 ? 'var(--red)' : 'inherit'}">${pct ? +pct.toFixed(2) + '%' : '—'}</b></span>
+    <span>P&L итого: <b style="color:${pc}">${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} $</b></span>`;
+  const hint = document.getElementById('comboHint');
+  const old = parseFloat(editOldPnl);
+  hint.textContent = (editOldPnl !== null && !isNaN(old) && Math.abs(old - pnl) > 0.005)
+    ? `Раньше у сделки был общий P&L ${old >= 0 ? '+' : ''}${old.toFixed(2)} $ — распредели его по монетам.`
+    : (pct > 100 ? 'Сумма % депозита больше 100.' : '');
+}
+
+document.querySelectorAll('#modeSwitch button').forEach(b => b.addEventListener('click', () => setFormMode(b.dataset.mode)));
+document.getElementById('fComboType').addEventListener('change', renderLegs);
+document.getElementById('legAdd').addEventListener('click', () => {
+  const k = comboKind();
+  const dir = k === 'hedge' ? (comboLegs.some(l => l.direction === 'LONG') && !comboLegs.some(l => l.direction === 'SHORT') ? 'SHORT' : 'LONG') : k.split('-')[1];
+  const prev = comboLegs[comboLegs.length - 1];
+  comboLegs.push({ ...emptyLeg(dir), leverage: prev ? prev.leverage : '' });
+  renderLegs();
+});
+document.getElementById('fDateIn').addEventListener('change', updateComboTotals);
 
 function openAdd(){
   editIdx = null;
@@ -826,6 +1326,17 @@ function openEdit(idx){
   document.getElementById('fReason').value = t.reason || '';
   document.getElementById('fNotes').value = t.notes || '';
   document.getElementById('fSizePct').value = t.sizePct || '';
+  if(Array.isArray(t.legs) && t.legs.length){
+    comboLegs = t.legs.map(l => ({ ...emptyLeg(), ...l }));
+    document.getElementById('fComboType').value = t.combo === 'hedge' ? 'hedge' : 'basket-' + (t.direction === 'SHORT' ? 'SHORT' : 'LONG');
+    editOldPnl = null;
+    document.getElementById('fCoin').value = '';
+    setFormMode('combo');
+  } else {
+    comboLegs = [];
+    editOldPnl = t.pnl || null;
+    setFormMode('single');
+  }
   selectedEmotions = t.emotion ? t.emotion.split(', ').filter(Boolean) : [];
   document.querySelectorAll('#emotionPicker .emotion-btn').forEach(b=>{
     b.classList.toggle('selected', selectedEmotions.includes(b.dataset.val));
@@ -845,7 +1356,7 @@ function openEdit(idx){
   });
   // при редактировании показываем сохранённый размер, не пересчитываем от текущего баланса
   const dynSize = getTradeSize(t);
-  if(dynSize){
+  if(dynSize && !t.legs){
     const el = document.getElementById('fSizeCalc');
     el.textContent = dynSize + ' USDT';
     el.style.color = 'var(--green)';
@@ -863,6 +1374,10 @@ function clearForm(){
   document.getElementById('fSizeCalc').textContent = '— USDT';
   currentFormSize = 0;
   document.getElementById('fDir').value = 'LONG';
+  comboLegs = [];
+  editOldPnl = null;
+  document.getElementById('fComboType').value = 'basket-LONG';
+  setFormMode('single');
   selectedEmotions = [];
   selectedExitEmotions = [];
   document.querySelectorAll('.emotion-btn').forEach(b=>b.classList.remove('selected'));
@@ -908,6 +1423,46 @@ document.querySelectorAll('#emotionExitPicker .exit-btn').forEach(btn=>{
 });
 
 document.getElementById('modalSave').addEventListener('click', async ()=>{
+  if(!dbGuard()) return;
+  const prevTrade = editIdx !== null ? trades[editIdx] : null;
+  const common = {
+    dateIn:    document.getElementById('fDateIn').value,
+    dateOut:   document.getElementById('fDateOut').value,
+    reason:    document.getElementById('fReason').value.trim(),
+    emotion:     selectedEmotions.join(', '),
+    emotionExit: selectedExitEmotions.join(', '),
+    notes:     document.getElementById('fNotes').value.trim(),
+    screenshots: screenshots.filter(Boolean).length ? [...screenshots] : (prevTrade ? prevTrade.screenshots || [] : []),
+  };
+  if(prevTrade && prevTrade.costs) common.costs = prevTrade.costs;
+
+  if(formMode === 'combo'){
+    const legs = comboLegs
+      .map(l => ({ ...l, coin: (l.coin || '').trim().toUpperCase() }))
+      .filter(l => l.coin);
+    if(legs.length < 2){ alert('В комбинации нужно минимум две монеты'); return; }
+    const kind = comboKind();
+    const hedge = kind === 'hedge';
+    if(!hedge) legs.forEach(l => l.direction = kind.split('-')[1]);
+    if(hedge && !(legs.some(l => l.direction === 'LONG') && legs.some(l => l.direction === 'SHORT'))){
+      if(!confirm('В хедже обычно есть и LONG, и SHORT, а сейчас все монеты в одну сторону. Сохранить так?')) return;
+    }
+    const pnlSum = legs.reduce((s, l) => s + (parseFloat(l.pnl) || 0), 0);
+    const trade = {
+      ...common,
+      combo: hedge ? 'hedge' : 'basket',
+      coin: legs.map(l => l.coin).join(' + '),
+      direction: hedge ? 'HEDGE' : kind.split('-')[1],
+      legs,
+      pnl: pnlSum.toFixed(2),
+      entry:'', exitPrice:'', stop:'', take:'', leverage:'', sizePct:'',
+    };
+    if(editIdx !== null){ trades[editIdx] = trade; } else { trades.unshift(trade); }
+    closeModal(); renderTable(); renderStats(); renderBalance();
+    await save();
+    return;
+  }
+
   const coin = document.getElementById('fCoin').value.trim().toUpperCase();
   if(!coin){ alert('Укажи монету'); return; }
   const trade = {
@@ -926,8 +1481,9 @@ document.getElementById('modalSave').addEventListener('click', async ()=>{
     emotion:     selectedEmotions.join(', '),
     emotionExit: selectedExitEmotions.join(', '),
     notes:     document.getElementById('fNotes').value.trim(),
-    screenshots: screenshots.filter(Boolean).length ? [...screenshots] : (editIdx !== null ? trades[editIdx].screenshots || [] : []),
+    screenshots: common.screenshots,
   };
+  if(common.costs) trade.costs = common.costs;
   if(editIdx !== null){ trades[editIdx] = trade; }
   else { trades.unshift(trade); }
   closeModal();
@@ -939,6 +1495,7 @@ document.getElementById('modalSave').addEventListener('click', async ()=>{
 
 // --- Delete ---
 async function deleteTrade(idx){
+  if(!dbGuard()) return;
   if(!confirm('Удалить сделку?')) return;
   trades.splice(idx, 1);
   document.getElementById('detailOverlay').classList.remove('open');
@@ -1038,15 +1595,11 @@ function resetUpload(){
 function updateSizeCalc(){
   const pct = parseFloat(document.getElementById('fSizePct').value) || 0;
   const lev = parseFloat(document.getElementById('fLeverage').value) || 0;
-  let bal;
-  if(editIdx === null){
-    // новая сделка — баланс на дату входа
-    const dateIn = document.getElementById('fDateIn').value;
-    bal = dateIn ? calcBalanceAtDate(dateIn) : balanceAtOpen;
-  } else {
-    // редактирование — используем сохранённый размер
-    bal = calcBalance();
-  }
+  // баланс на дату входа (при редактировании саму сделку не учитываем)
+  const dateIn = document.getElementById('fDateIn').value;
+  const bal = dateIn
+    ? calcBalanceAtDate(dateIn, editIdx === null ? undefined : editIdx)
+    : (editIdx === null ? balanceAtOpen : calcBalance());
   const el = document.getElementById('fSizeCalc');
   if(pct > 0 && lev > 0 && bal > 0){
     const size = (bal * pct / 100 * lev).toFixed(2);
@@ -1094,7 +1647,7 @@ function renderBalance(){
     item.innerHTML = `
       <div style="flex:1">
         <div class="bh-label">${label}${op.comment ? ' · ' + op.comment : ''}</div>
-        <div style="font-size:10px;color:var(--text-muted)">${op.date||''}</div>
+        <div style="font-size:10px;color:var(--text-muted)">${op.date||''}${opDateISO(op.date) ? ', ' + weekday(opDateISO(op.date)) : ''}</div>
       </div>
       <div class="bh-amount ${isPlus?'plus':'minus'}" style="margin-right:8px">${isPlus?'+':'-'}${a.toFixed(2)} $</div>
       <button class="bh-edit-btn" data-idx="${realIdx}" title="Редактировать">✏</button>
@@ -1110,6 +1663,7 @@ function renderBalance(){
   hist.querySelectorAll('.bh-del-btn').forEach(btn=>{
     btn.addEventListener('click', async e=>{
       e.stopPropagation();
+      if(!dbGuard()) return;
       balanceOps.splice(parseInt(btn.dataset.idx), 1);
       renderBalance(); await saveBalance();
     });
@@ -1144,6 +1698,7 @@ document.addEventListener('click', e=>{
 document.getElementById('bSaveBtn').addEventListener('click', async ()=>{
   const amount = parseFloat(document.getElementById('bAmount').value);
   if(!amount || amount <= 0){ alert('Укажи сумму'); return; }
+  if(!dbGuard()) return;
   const btn = document.getElementById('bSaveBtn');
   const editIdx = btn.dataset.editIdx;
   const dateISO = document.getElementById('bDate').value || new Date().toISOString().split('T')[0];
@@ -1174,14 +1729,26 @@ async function loadBalance(){
     const val = await sbGet('balance');
     balanceOps = val ? JSON.parse(val) : [];
     if(!Array.isArray(balanceOps)) balanceOps = [];
-  }catch(e){ balanceOps = []; }
+    balanceOk = true;
+    localSave('balance', balanceOps);
+  }catch(e){
+    balanceOk = false;
+    const copy = localLoad('balance');
+    balanceOps = copy && Array.isArray(copy.data) ? copy.data : [];
+    showOffline(copy && copy.at);
+  }
   renderBalance();
+  renderTable();
 }
 
 async function saveBalance(){
+  if(!balanceOk){ setStatus('Не сохранено: нет связи с базой', false); return; }
   try{
     await sbSet('balance', JSON.stringify(balanceOps));
-  }catch(e){}
+    localSave('balance', balanceOps);
+  }catch(e){
+    setStatus('Ошибка сохранения баланса', false);
+  }
 }
 
 // custom tooltip positioning
@@ -1201,11 +1768,366 @@ document.addEventListener('mousemove', e=>{
 // position calc listeners
 document.getElementById('fSizePct').addEventListener('input', updateSizeCalc);
 document.getElementById('fLeverage').addEventListener('input', updateSizeCalc);
+document.getElementById('fDateIn').addEventListener('change', updateSizeCalc);
+
+// --- Бэкап ---
+const backupMenu = document.getElementById('backupMenu');
+document.getElementById('backupBtn').addEventListener('click', e=>{
+  e.stopPropagation();
+  const copy = localLoad('trades');
+  document.getElementById('backupNote').textContent = 'Сделки, баланс и книга одним файлом.' +
+    (copy ? ` Копия в браузере обновлена ${fmtStamp(copy.at)}.` : '');
+  backupMenu.classList.toggle('open');
+});
+document.addEventListener('click', e=>{
+  if(!backupMenu.contains(e.target) && e.target.id !== 'backupBtn') backupMenu.classList.remove('open');
+});
+document.getElementById('backupDownload').addEventListener('click', ()=>{
+  const data = {
+    app: 'TradeLog', version: 1, exportedAt: new Date().toISOString(),
+    trades, balance: balanceOps,
+    book: (typeof bookEntries !== 'undefined') ? { sections: BOOK_SECTIONS, entries: bookEntries } : null
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type:'application/json' });
+  const a = document.createElement('a');
+  const d = new Date(); const p = n => String(n).padStart(2,'0');
+  a.href = URL.createObjectURL(blob);
+  a.download = `tradelog-backup-${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+  backupMenu.classList.remove('open');
+});
+document.getElementById('backupRestore').addEventListener('click', ()=>{
+  backupMenu.classList.remove('open');
+  if(!dbGuard()) return;
+  document.getElementById('backupFile').click();
+});
+document.getElementById('backupFile').addEventListener('change', async e=>{
+  const file = e.target.files[0]; e.target.value = '';
+  if(!file) return;
+  let data;
+  try{ data = JSON.parse(await file.text()); }catch(err){ alert('Не получилось прочитать файл бэкапа.'); return; }
+  if(!data || data.app !== 'TradeLog' || !Array.isArray(data.trades)){ alert('Это не файл бэкапа TradeLog.'); return; }
+  const when = data.exportedAt ? fmtStamp(Date.parse(data.exportedAt)) : 'неизвестной даты';
+  if(!confirm(`Заменить все текущие данные бэкапом от ${when}?\nСделок в бэкапе: ${data.trades.length}. Текущие сделки, баланс и книга будут перезаписаны.`)) return;
+  trades = data.trades;
+  balanceOps = Array.isArray(data.balance) ? data.balance : [];
+  renderTable(); renderStats(); renderBalance();
+  await save(); await saveBalance();
+  if(data.book && typeof bookRestore === 'function') await bookRestore(data.book);
+  alert('Готово: данные восстановлены из бэкапа.');
+});
+document.getElementById('offlineRetry').addEventListener('click', ()=> location.reload());
 
 // Init
 initUpload();
 load();
 loadBalance();
+</script>
+
+<script>
+// ===================== ДЕНЬ / НОЧЬ =====================
+(function(){
+  const btn = document.getElementById('themeBtn');
+  function paint(){
+    const dark = document.documentElement.dataset.theme === 'dark';
+    btn.textContent = dark ? '☀' : '☾';
+    btn.title = dark ? 'Светлая тема' : 'Тёмная тема';
+  }
+  btn.addEventListener('click', ()=>{
+    const dark = document.documentElement.dataset.theme !== 'dark';
+    if(dark) document.documentElement.dataset.theme = 'dark';
+    else delete document.documentElement.dataset.theme;
+    try{ localStorage.setItem('tradelog-theme', dark ? 'dark' : 'light'); }catch(e){}
+    paint();
+  });
+  paint();
+})();
+
+// ===================== КНИГА ТРЕЙДЕРА =====================
+const BOOK_DEFAULT_SECTIONS = [
+  { id:'laws',  name:'Законы рынка',   desc:'Как ведёт себя рынок, независимо от меня.' },
+  { id:'rules', name:'Правила рынка',  desc:'Правила, которые я соблюдаю в каждой сделке.' },
+  { id:'princ', name:'Мои принципы',   desc:'Как я отношусь к торговле, риску и себе.' },
+  { id:'strat', name:'Моя стратегия',  desc:'Как я нахожу вход, ставлю стоп и выхожу.' },
+  { id:'obs',   name:'Наблюдения',     desc:'Что я замечаю на рынке.' },
+  { id:'ideas', name:'Идеи',           desc:'Мысли и гипотезы, которые нужно проверить.' }
+];
+let BOOK_SECTIONS = BOOK_DEFAULT_SECTIONS.map(x => ({...x}));
+let bookEditingHead = false;
+
+// черновик для первого открытия — пока книга в базе пустая
+const BOOK_DRAFT = [
+  { sec:'laws',  title:'Пробитый уровень меняет роль',
+    text:'Уровень, который пробили и закрепились за ним, начинает работать в обратную сторону. Если уровень сломан — сценарий переворачивается, а не «пересиживается».' },
+  { sec:'laws',  title:'Биткоин задаёт фон для альтов',
+    text:'Сам биткоин не торгую, но смотрю на него перед каждой сделкой. Когда он падает, альты не удерживают свои поддержки, даже сильные.' },
+  { sec:'rules', title:'Не торгую посередине',
+    text:'Вход только от уровня, со стопом за ним. Если цена между уровнями — жду.' },
+  { sec:'rules', title:'Монету слабее биткоина не лонгую',
+    text:'Если монета слабее рынка, покупатели в ней слабы. Лонг в такой монете — ставка против силы.' },
+  { sec:'rules', title:'Сильные монеты не шорчу против дневного тренда',
+    text:'Шорт — только в слабых монетах и на ретесте уровня снизу.' },
+  { sec:'rules', title:'Стоп не прямо под очевидным минимумом',
+    text:'Под очевидным минимумом стоят стопы у всех, туда цену и выносят. Стоп ставлю с запасом, за уровнем.' },
+  { sec:'rules', title:'Плечо до 5x, изолированная маржа',
+    text:'Isolated, плечо не выше 5x, стоп по Mark Price.' },
+  { sec:'strat', title:'Частичная фиксация и раннер',
+    text:'У сильного уровня закрываю часть позиции. После первой цели остаток веду дальше, стоп переношу не хуже точки входа.' }
+];
+
+let bookEntries = [];
+let bookLoaded = false;      // false — данные не загрузились, сохранять нельзя
+let bookCurrent = 'laws';
+let bookQuery = '';
+let bookEditId = null;
+let bookFormImgs = [];
+let bookUploading = 0;
+
+const $b = id => document.getElementById(id);
+const bookEsc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const bookFmt = iso => fmtDate(iso, true);
+const bookToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+const bookMatch = e => !bookQuery || (e.title + ' ' + e.text).toLowerCase().includes(bookQuery.toLowerCase());
+function bookHL(s){
+  const e = bookEsc(s);
+  if(!bookQuery) return e;
+  const q = bookEsc(bookQuery).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return e.replace(new RegExp(q, 'gi'), m => `<mark>${m}</mark>`);
+}
+function bookSetStatus(msg){ $b('bookStatus').textContent = msg; }
+
+async function bookLoad(){
+  bookSetStatus('Загрузка…');
+  try{
+    const val = await sbGet('book');
+    if(val){
+      const parsed = JSON.parse(val);
+      if(Array.isArray(parsed)){
+        bookEntries = parsed;                       // старый формат
+      } else {
+        bookEntries = Array.isArray(parsed.entries) ? parsed.entries : [];
+        const saved = Array.isArray(parsed.sections) ? parsed.sections : [];
+        BOOK_SECTIONS = BOOK_DEFAULT_SECTIONS.map(d => ({ ...d, ...(saved.find(x => x.id === d.id) || {}) }));
+      }
+    } else {
+      const today = bookToday();
+      bookEntries = BOOK_DRAFT.map((e,i) => ({ id: Date.now()+i, date: today, imgs: [], ...e }));
+    }
+    bookLoaded = true;
+    localSave('book', { sections: BOOK_SECTIONS, entries: bookEntries });
+    bookSetStatus('');
+  }catch(e){
+    bookLoaded = false;
+    const copy = localLoad('book');
+    if(copy && copy.data){
+      bookEntries = Array.isArray(copy.data.entries) ? copy.data.entries : [];
+      const saved = Array.isArray(copy.data.sections) ? copy.data.sections : [];
+      BOOK_SECTIONS = BOOK_DEFAULT_SECTIONS.map(d => ({ ...d, ...(saved.find(x => x.id === d.id) || {}) }));
+    }
+    bookSetStatus(copy ? `Нет связи с базой. Показана копия от ${fmtStamp(copy.at)}, изменения не сохранятся.` : 'Нет связи с базой. Изменения сейчас не сохранятся.');
+  }
+  bookRender();
+}
+
+async function bookSave(){
+  if(!bookLoaded){ bookSetStatus('Нет связи с базой. Изменения не сохранены.'); return false; }
+  bookSetStatus('Сохранение…');
+  try{
+    const res = await fetch(`${SB_URL}/rest/v1/tradelog`, {
+      method:'POST',
+      headers:{ ...SB_HEADERS, 'Prefer':'resolution=merge-duplicates' },
+      body: JSON.stringify({ key:'book', value: JSON.stringify({ sections: BOOK_SECTIONS, entries: bookEntries }) })
+    });
+    if(!res.ok) throw new Error(res.status);
+    localSave('book', { sections: BOOK_SECTIONS, entries: bookEntries });
+    bookSetStatus('Сохранено ✓');
+    setTimeout(()=>{ if($b('bookStatus').textContent === 'Сохранено ✓') bookSetStatus(''); }, 2000);
+    return true;
+  }catch(e){
+    bookSetStatus('Ошибка сохранения. Проверь интернет и повтори.');
+    return false;
+  }
+}
+
+function bookRender(){
+  // разделы
+  $b('bookSections').innerHTML = BOOK_SECTIONS.map(s => {
+    const n = bookEntries.filter(e => e.sec === s.id && bookMatch(e)).length;
+    return `<button class="book-sec ${s.id===bookCurrent?'active':''}" data-sec="${s.id}">${bookEsc(s.name)}<span class="count">${n}</span></button>`;
+  }).join('');
+  $b('bookSections').querySelectorAll('.book-sec').forEach(b => b.onclick = () => { bookCurrent = b.dataset.sec; bookEditingHead = false; bookRender(); $b('bookPage').parentElement.scrollTop = 0; });
+
+  // страница
+  const s = BOOK_SECTIONS.find(x => x.id === bookCurrent);
+  const list = bookEntries.filter(e => e.sec === bookCurrent && bookMatch(e));
+  $b('bookPage').innerHTML = `
+    ${bookEditingHead ? `
+    <div class="book-head editing">
+      <div class="book-head-form">
+        <input id="bkHeadName" value="${bookEsc(s.name)}" placeholder="Название раздела" aria-label="Название раздела">
+        <input id="bkHeadDesc" value="${bookEsc(s.desc)}" placeholder="Короткое описание (необязательно)" aria-label="Описание раздела">
+        <div class="book-head-actions">
+          <button class="book-add" id="bkHeadSave">Сохранить</button>
+          <button class="bk-cancel" id="bkHeadCancel">Отмена</button>
+        </div>
+      </div>
+    </div>` : `
+    <div class="book-head">
+      <div><h1>${bookEsc(s.name)}</h1>${s.desc ? `<p>${bookEsc(s.desc)}</p>` : ''}</div>
+      <div class="book-head-btns">
+        <button class="book-tool" id="bkHeadEdit" title="Изменить название и описание раздела">Изменить заголовок</button>
+        <button class="book-add" id="bkAddBtn">+ Запись</button>
+      </div>
+    </div>`}
+    ${list.length ? list.map(e => `
+      <article class="book-entry">
+        <div class="book-tools">
+          <button class="book-tool" data-edit="${e.id}">Изменить</button>
+          <button class="book-tool del" data-del="${e.id}">Удалить</button>
+        </div>
+        <h2>${bookHL(e.title)}</h2>
+        ${e.text ? `<div class="text">${bookHL(e.text)}</div>` : ''}
+        ${(e.imgs||[]).length ? `<figure>${e.imgs.map(src => `<img src="${bookEsc(src)}" alt="Скрин графика к записи «${bookEsc(e.title)}»" data-zoom>`).join('')}</figure>` : ''}
+        <div class="meta">Добавлено ${bookFmt(e.date)}${e.edited ? ' · изменено ' + bookFmt(e.edited) : ''}</div>
+      </article>`).join('')
+    : `<div class="book-empty">${bookQuery ? 'Ничего не нашлось.' : 'В этом разделе пока пусто. Добавь первую запись.'}</div>`}`;
+
+  if(bookEditingHead){
+    const nameEl = $b('bkHeadName');
+    nameEl.focus(); nameEl.select();
+    const saveHead = async () => {
+      const name = nameEl.value.trim();
+      if(!name){ nameEl.classList.add('err'); nameEl.focus(); return; }
+      s.name = name;
+      s.desc = $b('bkHeadDesc').value.trim();
+      bookEditingHead = false;
+      bookRender();
+      await bookSave();
+    };
+    $b('bkHeadSave').onclick = saveHead;
+    $b('bkHeadCancel').onclick = () => { bookEditingHead = false; bookRender(); };
+    [nameEl, $b('bkHeadDesc')].forEach(el => el.onkeydown = ev => {
+      if(ev.key === 'Enter') saveHead();
+      if(ev.key === 'Escape'){ ev.stopPropagation(); bookEditingHead = false; bookRender(); }
+    });
+    nameEl.oninput = () => nameEl.classList.remove('err');
+  } else {
+    $b('bkAddBtn').onclick = () => bookOpenModal(null);
+    $b('bkHeadEdit').onclick = () => { bookEditingHead = true; bookRender(); };
+  }
+  $b('bookPage').querySelectorAll('[data-edit]').forEach(b => b.onclick = () => bookOpenModal(+b.dataset.edit));
+  $b('bookPage').querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+    const e = bookEntries.find(x => x.id === +b.dataset.del);
+    if(!e || !confirm(`Удалить запись «${e.title}»?`)) return;
+    bookEntries = bookEntries.filter(x => x !== e);
+    bookRender();
+    await bookSave();
+  });
+  $b('bookPage').querySelectorAll('[data-zoom]').forEach(img => img.onclick = () => {
+    $b('bkLightbox').innerHTML = `<img src="${img.src}" alt="">`;
+    $b('bkLightbox').classList.add('open');
+  });
+}
+
+// ---------- окно записи ----------
+function bookRenderThumbs(){
+  $b('bkThumbs').innerHTML = bookFormImgs.map((src,i) =>
+    `<div class="bk-thumb"><img src="${bookEsc(src)}" alt=""><button data-rm="${i}" title="Убрать скрин">✕</button></div>`).join('');
+  $b('bkThumbs').querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { bookFormImgs.splice(+b.dataset.rm, 1); bookRenderThumbs(); });
+}
+
+function bookOpenModal(id){
+  bookEditId = id;
+  const e = id ? bookEntries.find(x => x.id === id) : null;
+  $b('bkModalTitle').textContent = e ? 'Изменить запись' : 'Новая запись';
+  $b('bkSec').innerHTML = BOOK_SECTIONS.map(s => `<option value="${s.id}">${bookEsc(s.name)}</option>`).join('');
+  $b('bkSec').value = e ? e.sec : bookCurrent;
+  $b('bkTitle').value = e ? e.title : '';
+  $b('bkTitle').classList.remove('err');
+  $b('bkText').value = e ? e.text : '';
+  bookFormImgs = e ? [...(e.imgs||[])] : [];
+  $b('bkUploadMsg').textContent = '';
+  bookRenderThumbs();
+  $b('bkModalBg').classList.add('open');
+  $b('bkTitle').focus();
+}
+function bookCloseModal(){ $b('bkModalBg').classList.remove('open'); }
+
+async function bookUpload(file){
+  if(!file || !file.type.startsWith('image/')) return;
+  bookUploading++;
+  $b('bkUploadMsg').style.color = '#5C635F';
+  $b('bkUploadMsg').textContent = '⏳ Загрузка скрина…';
+  try{
+    const ext = (file.type.split('/')[1] || 'png').replace('jpeg','jpg');
+    const filename = `book_${Date.now()}_${Math.random().toString(36).slice(2,7)}.${ext}`;
+    const res = await fetch(`${SB_URL}/storage/v1/object/screenshots/${filename}`, {
+      method:'POST',
+      headers:{ 'apikey':SB_KEY, 'Authorization':'Bearer ' + SB_KEY, 'Content-Type':file.type },
+      body:file
+    });
+    if(!res.ok) throw new Error(res.status);
+    bookFormImgs.push(`${SB_URL}/storage/v1/object/public/screenshots/${filename}`);
+    bookRenderThumbs();
+    $b('bkUploadMsg').style.color = '#0A8A68';
+    $b('bkUploadMsg').textContent = '✓ Скрин загружен';
+  }catch(e){
+    $b('bkUploadMsg').style.color = '#C62F47';
+    $b('bkUploadMsg').textContent = '⚠ Скрин не загрузился (' + e.message + '). Попробуй ещё раз.';
+  }finally{
+    bookUploading--;
+  }
+}
+
+$b('bkDrop').onclick = () => $b('bkFile').click();
+$b('bkFile').onchange = () => { [...$b('bkFile').files].forEach(bookUpload); $b('bkFile').value = ''; };
+$b('bkDrop').ondragover = ev => { ev.preventDefault(); $b('bkDrop').classList.add('over'); };
+$b('bkDrop').ondragleave = () => $b('bkDrop').classList.remove('over');
+$b('bkDrop').ondrop = ev => { ev.preventDefault(); $b('bkDrop').classList.remove('over'); [...ev.dataTransfer.files].forEach(bookUpload); };
+document.addEventListener('paste', ev => {
+  if(!$b('bkModalBg').classList.contains('open')) return;
+  const items = [...(ev.clipboardData?.items || [])].filter(i => i.type.startsWith('image/'));
+  if(items.length){ ev.preventDefault(); items.forEach(i => bookUpload(i.getAsFile())); }
+});
+
+$b('bkCancel').onclick = bookCloseModal;
+$b('bkSave').onclick = async () => {
+  const title = $b('bkTitle').value.trim();
+  if(!title){ $b('bkTitle').classList.add('err'); $b('bkTitle').focus(); return; }
+  if(bookUploading){ $b('bkUploadMsg').textContent = 'Подожди, скрин ещё загружается…'; return; }
+  const data = { sec:$b('bkSec').value, title, text:$b('bkText').value.trim(), imgs:[...bookFormImgs] };
+  if(bookEditId){
+    Object.assign(bookEntries.find(x => x.id === bookEditId), data, { edited: bookToday() });
+  } else {
+    bookEntries.unshift({ id:Date.now(), date:bookToday(), ...data });
+  }
+  bookCurrent = data.sec;
+  bookCloseModal();
+  bookRender();
+  await bookSave();
+};
+$b('bkTitle').oninput = () => $b('bkTitle').classList.remove('err');
+
+$b('bkLightbox').onclick = () => $b('bkLightbox').classList.remove('open');
+$b('bookSearch').oninput = () => { bookQuery = $b('bookSearch').value.trim(); bookRender(); };
+$b('openBookBtn').onclick = () => { $b('book').classList.add('open'); document.body.style.overflow = 'hidden'; };
+$b('closeBookBtn').onclick = () => { $b('book').classList.remove('open'); document.body.style.overflow = ''; };
+document.addEventListener('keydown', ev => {
+  if(ev.key !== 'Escape' || !$b('book').classList.contains('open')) return;
+  if($b('bkLightbox').classList.contains('open')) $b('bkLightbox').classList.remove('open');
+  else if($b('bkModalBg').classList.contains('open')) bookCloseModal();
+});
+
+async function bookRestore(book){
+  bookEntries = Array.isArray(book.entries) ? book.entries : [];
+  const saved = Array.isArray(book.sections) ? book.sections : [];
+  BOOK_SECTIONS = BOOK_DEFAULT_SECTIONS.map(d => ({ ...d, ...(saved.find(x => x.id === d.id) || {}) }));
+  bookRender();
+  await bookSave();
+}
+
+bookLoad();
 </script>
 </body>
 </html>
