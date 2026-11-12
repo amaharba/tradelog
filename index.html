@@ -1000,7 +1000,7 @@ function renderTable(){
       <td style="font-size:13px;color:${t.exitPrice?'var(--text)':'var(--text-muted)'}">${isCombo ? '—' : (t.exitPrice || '—')}</td>
       <td style="font-size:13px">${isCombo ? comboLeverage(t) : '×' + (t.leverage || '—')}</td>
       <td style="font-size:13px">${(()=>{ const s=getTradeSize(t); return s ? s + ' $' : '—'; })()}</td>
-      <td><span class="pnl ${pnlClass}">${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} $</span></td>
+      <td><span class="pnl ${pnlClass}">${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} $</span>${roiHtml(pnl, tradeMargin(t, realIdx))}</td>
       <td style="font-size:12px">
         ${t.emotion ? `<span style="color:var(--green)">${t.emotion}</span>` : ''}
         ${t.emotion && t.emotionExit ? '<br>' : ''}
@@ -1036,7 +1036,7 @@ function renderTable(){
           <td>${l.exit || '—'}</td>
           <td>×${l.leverage || '—'}</td>
           <td>${sz ? sz.toFixed(2) + ' $' : '—'}</td>
-          <td><span class="pnl ${lp>0?'pos':lp<0?'neg':'zero'}" style="font-size:12px">${lp>=0?'+':''}${lp.toFixed(2)} $</span></td>
+          <td><span class="pnl ${lp>0?'pos':lp<0?'neg':'zero'}" style="font-size:12px">${lp>=0?'+':''}${lp.toFixed(2)} $</span>${roiHtml(lp, (parseFloat(l.leverage)||0) > 0 ? sz / parseFloat(l.leverage) : 0, true)}</td>
           <td colspan="4" style="color:var(--text-soft)">${l.stop ? 'стоп ' + l.stop : ''}${l.stop && l.take ? ' · ' : ''}${l.take ? 'тейк ' + l.take : ''}</td>`;
         body.appendChild(lr);
       });
@@ -1076,6 +1076,7 @@ function showDetail(idx){
     ['Размер позиции', (()=>{ const s=getTradeSize(t); return s ? s + ' USDT' : '—'; })()],
     ['Издержки', t.costs ? '−' + parseFloat(t.costs).toFixed(2) + ' $' : '—'],
     ['P&L (итого)', `<span class="pnl ${pnl>0?'pos':pnl<0?'neg':'zero'}">${pnl>=0?'+':''}${pnl.toFixed(2)} $</span>`],
+    ['ROI (от маржи)', (()=>{ const m = tradeMargin(t, idx); return m > 0 ? `${(pnl/m*100)>=0?'+':''}${(pnl/m*100).toFixed(2)}% · маржа ${m.toFixed(2)} $` : '—'; })()],
     ['Эмоции (вход)', t.emotion || '—'],
     ['Эмоции (выход)', t.emotionExit || '—'],
   ] : [
@@ -1096,6 +1097,7 @@ function showDetail(idx){
     })()],
     ['Издержки', t.costs ? '−' + parseFloat(t.costs).toFixed(2) + ' $' : '—'],
     ['P&L', `<span class="pnl ${pnl>0?'pos':pnl<0?'neg':'zero'}">${pnl>=0?'+':''}${pnl.toFixed(2)} $</span>`],
+    ['ROI (от маржи)', (()=>{ const m = tradeMargin(t, idx); return m > 0 ? `${(pnl/m*100)>=0?'+':''}${(pnl/m*100).toFixed(2)}% · маржа ${m.toFixed(2)} $` : '—'; })()],
     ['Эмоции (вход)', t.emotion || '—'],
     ['Эмоции (выход)', t.emotionExit || '—'],
   ];
@@ -1160,6 +1162,25 @@ function legSize(leg, bal){
 // какую часть депозита заняла маржа сделки (%)
 function depoPct(size, lev, bal){
   return (size > 0 && lev > 0 && bal > 0) ? size / lev / bal * 100 : 0;
+}
+
+// маржа (сумма без плеча) и ROI сделки в % от неё
+function tradeMargin(t, idx){
+  if(Array.isArray(t.legs) && t.legs.length){
+    const bal = t.dateIn ? calcBalanceAtDate(t.dateIn, idx) : 0;
+    return t.legs.reduce((s, l) => {
+      const lev = parseFloat(l.leverage) || 0, sz = legSize(l, bal);
+      return s + (lev > 0 && sz > 0 ? sz / lev : 0);
+    }, 0);
+  }
+  const size = parseFloat(getTradeSize(t)) || 0, lev = parseFloat(t.leverage) || 0;
+  return size > 0 && lev > 0 ? size / lev : 0;
+}
+function roiHtml(pnl, margin, small){
+  if(!(margin > 0)) return '';
+  const r = pnl / margin * 100;
+  const c = r > 0 ? 'var(--green)' : r < 0 ? 'var(--red)' : 'var(--text-soft)';
+  return `<span style="display:block;font-size:${small ? 10 : 11}px;font-weight:600;color:${c};opacity:.8;margin-top:2px">${r >= 0 ? '+' : ''}${r.toFixed(2)}%</span>`;
 }
 
 function getTradeSize(t){
