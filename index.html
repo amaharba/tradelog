@@ -170,6 +170,29 @@
   .draft-note.show{ display:flex; }
   .draft-note button{ background:none; border:1px solid currentColor; color:inherit; border-radius:6px; padding:3px 10px; font-family:inherit; font-size:12px; font-weight:600; cursor:pointer; }
 
+  /* ЭКРАН ВХОДА */
+  .auth-screen{ position:fixed; inset:0; z-index:1000; background:var(--bg); display:flex; align-items:center; justify-content:center; padding:20px; }
+  .auth-screen.hidden{ display:none; }
+  .auth-card{ width:100%; max-width:380px; background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:28px; box-shadow:0 10px 40px rgba(0,0,0,.12); }
+  .auth-card .logo{ font-size:20px; margin-bottom:6px; }
+  .auth-card h2{ font-size:15px; font-weight:600; color:var(--text-soft); margin-bottom:20px; }
+  .auth-step{ display:none; flex-direction:column; gap:12px; }
+  .auth-step.active{ display:flex; }
+  .auth-step label{ font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--text-soft); display:block; margin-bottom:6px; }
+  .auth-step input[type=email], .auth-step input[type=password], .auth-step input.code{ width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:inherit; font-size:15px; padding:11px 12px; }
+  .auth-step input:focus{ outline:2px solid var(--green); outline-offset:-1px; }
+  .auth-step input.code{ font-size:24px; letter-spacing:.4em; text-align:center; font-variant-numeric:tabular-nums; }
+  .auth-step .remember{ display:flex; align-items:center; gap:8px; font-size:13px; font-weight:400; letter-spacing:0; text-transform:none; margin:0; color:var(--text-soft); cursor:pointer; }
+  .auth-step .remember input{ width:16px; height:16px; accent-color:var(--green); }
+  .auth-btn{ background:var(--green); color:var(--on-green); border:none; border-radius:8px; padding:12px; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; }
+  .auth-btn:disabled{ opacity:.55; cursor:wait; }
+  .auth-link{ background:none; border:none; color:var(--text-soft); font-family:inherit; font-size:12px; cursor:pointer; text-decoration:underline; padding:0; align-self:center; }
+  .auth-err{ color:var(--red); font-size:13px; min-height:18px; }
+  .auth-hint{ font-size:13px; color:var(--text-soft); line-height:1.5; }
+  .auth-qr{ background:#fff; border-radius:10px; padding:10px; align-self:center; }
+  .auth-qr img{ display:block; width:180px; height:180px; }
+  .auth-secret{ font-family:ui-monospace,Consolas,monospace; font-size:12px; background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:8px; word-break:break-all; text-align:center; user-select:all; }
+
   /* баннер «нет связи с базой» */
   .offline-banner{ display:none; background:var(--red-soft); color:var(--red); border-bottom:1px solid var(--red); padding:10px 24px; font-size:13px; font-weight:500; align-items:center; gap:14px; flex-wrap:wrap; }
   .offline-banner.show{ display:flex; }
@@ -460,6 +483,42 @@
 </style>
 </head>
 <body>
+<!-- ЭКРАН ВХОДА -->
+<div class="auth-screen" id="authScreen">
+  <div class="auth-card">
+    <div class="logo">TRADE<span>LOG</span></div>
+    <h2 id="authTitle">Вход в журнал</h2>
+
+    <div class="auth-step" id="stepLoading"><div class="auth-hint">Проверка входа…</div></div>
+
+    <form class="auth-step" id="stepLogin" autocomplete="on" onsubmit="return false">
+      <div><label for="authEmail">Email</label><input type="email" id="authEmail" autocomplete="username" required></div>
+      <div><label for="authPass">Пароль</label><input type="password" id="authPass" autocomplete="current-password" required></div>
+      <label class="remember"><input type="checkbox" id="authRemember"> Запомнить это устройство на 30 дней</label>
+      <div class="auth-err" id="loginErr"></div>
+      <button class="auth-btn" id="loginBtn" type="submit">Войти</button>
+    </form>
+
+    <form class="auth-step" id="stepCode" onsubmit="return false">
+      <div class="auth-hint">Введи 6-значный код из приложения-аутентификатора.</div>
+      <input class="code" id="codeInput" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••">
+      <div class="auth-err" id="codeErr"></div>
+      <button class="auth-btn" id="codeBtn" type="submit">Подтвердить</button>
+      <button class="auth-link" id="codeBack" type="button">Выйти и войти заново</button>
+    </form>
+
+    <form class="auth-step" id="stepEnroll" onsubmit="return false">
+      <div class="auth-hint">Первый вход: подключи двухфакторную защиту. Открой Google Authenticator (или другое приложение-аутентификатор), нажми «+» и отсканируй код.</div>
+      <div class="auth-qr"><img id="enrollQr" alt="QR-код для приложения-аутентификатора"></div>
+      <div class="auth-hint" style="font-size:12px">Не сканируется? Введи ключ вручную:</div>
+      <div class="auth-secret" id="enrollSecret"></div>
+      <input class="code" id="enrollCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••">
+      <div class="auth-err" id="enrollErr"></div>
+      <button class="auth-btn" id="enrollBtn" type="submit">Подтвердить и войти</button>
+    </form>
+  </div>
+</div>
+
 
 <div class="header">
   <div class="header-left">
@@ -473,6 +532,7 @@
   </div>
   <div class="header-right">
     <button class="btn btn-ghost theme-btn" id="themeBtn" title="Тёмная тема">☾</button>
+    <button class="btn btn-ghost" id="logoutBtn" title="Выйти из журнала">Выйти</button>
     <div class="backup-wrap">
       <button class="btn btn-ghost" id="backupBtn" title="Резервная копия">Бэкап</button>
       <div class="backup-menu" id="backupMenu">
@@ -833,14 +893,13 @@
 // --- Supabase ---
 const SB_URL = 'https://ifrtyfypzpfuwzzistfg.supabase.co';
 const SB_KEY = 'sb_publishable_Ms3YLkiCuHi6naSl39_RoQ_S1rpvNza';
-const SB_HEADERS = {
-  'Content-Type': 'application/json',
-  'apikey': SB_KEY,
-  'Authorization': 'Bearer ' + SB_KEY
-};
+let SB_TOKEN = null;   // токен после входа; без него база ничего не отдаёт
+function sbHeaders(){
+  return { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + (SB_TOKEN || SB_KEY), 'Content-Type': 'application/json' };
+}
 
 async function sbGet(key){
-  const res = await fetch(`${SB_URL}/rest/v1/tradelog?key=eq.${key}&select=value`, { headers: SB_HEADERS });
+  const res = await fetch(`${SB_URL}/rest/v1/tradelog?key=eq.${key}&select=value`, { headers: sbHeaders() });
   if(!res.ok) throw new Error('HTTP ' + res.status);
   const data = await res.json();
   if(!Array.isArray(data)) throw new Error('Неожиданный ответ базы');
@@ -850,7 +909,7 @@ async function sbGet(key){
 async function sbSet(key, value){
   const res = await fetch(`${SB_URL}/rest/v1/tradelog`, {
     method: 'POST',
-    headers: { ...SB_HEADERS, 'Prefer': 'resolution=merge-duplicates' },
+    headers: { ...sbHeaders(), 'Prefer': 'resolution=merge-duplicates' },
     body: JSON.stringify({ key, value })
   });
   if(!res.ok) throw new Error('HTTP ' + res.status);
@@ -1663,7 +1722,7 @@ async function handleFile(file, idx){
     const filename = `screenshot_${Date.now()}_${idx}.jpg`;
     const res = await fetch(`${SB_URL}/storage/v1/object/screenshots/${filename}`, {
       method: 'POST',
-      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': file.type },
+      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + (SB_TOKEN || SB_KEY), 'Content-Type': file.type },
       body: file
     });
     if(!res.ok) throw new Error('Upload failed: ' + res.status);
@@ -1954,10 +2013,9 @@ document.getElementById('backupFile').addEventListener('change', async e=>{
 });
 document.getElementById('offlineRetry').addEventListener('click', ()=> location.reload());
 
-// Init
+// Init — данные грузятся только после входа (см. блок авторизации внизу)
 initUpload();
-load();
-loadBalance();
+window.__startJournal = () => { load(); loadBalance(); };
 </script>
 
 <script>
@@ -2071,7 +2129,7 @@ async function bookSave(){
   try{
     const res = await fetch(`${SB_URL}/rest/v1/tradelog`, {
       method:'POST',
-      headers:{ ...SB_HEADERS, 'Prefer':'resolution=merge-duplicates' },
+      headers:{ ...sbHeaders(), 'Prefer':'resolution=merge-duplicates' },
       body: JSON.stringify({ key:'book', value: JSON.stringify({ sections: BOOK_SECTIONS, entries: bookEntries }) })
     });
     if(!res.ok) throw new Error(res.status);
@@ -2199,7 +2257,7 @@ async function bookUpload(file){
     const filename = `book_${Date.now()}_${Math.random().toString(36).slice(2,7)}.${ext}`;
     const res = await fetch(`${SB_URL}/storage/v1/object/screenshots/${filename}`, {
       method:'POST',
-      headers:{ 'apikey':SB_KEY, 'Authorization':'Bearer ' + SB_KEY, 'Content-Type':file.type },
+      headers:{ 'apikey':SB_KEY, 'Authorization':'Bearer ' + (SB_TOKEN || SB_KEY), 'Content-Type':file.type },
       body:file
     });
     if(!res.ok) throw new Error(res.status);
@@ -2262,7 +2320,186 @@ async function bookRestore(book){
   await bookSave();
 }
 
-bookLoad();
+window.__startBook = bookLoad;
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+// ===================== ВХОД: пароль + код из аутентификатора =====================
+const REMEMBER_KEY = 'tradelog-remember';          // '1' — запомнить устройство
+const REMEMBER_UNTIL = 'tradelog-remember-until';  // срок, после которого вход заново
+const REMEMBER_DAYS = 30;
+const ls = { get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } },
+             set(k,v){ try{ localStorage.setItem(k,v); }catch(e){} },
+             del(k){ try{ localStorage.removeItem(k); }catch(e){} } };
+
+// сессия хранится в localStorage только на «запомненном» устройстве, иначе — до закрытия браузера
+const authStorage = {
+  _s(){ return ls.get(REMEMBER_KEY) === '1' ? localStorage : sessionStorage; },
+  getItem(k){ try{ return this._s().getItem(k); }catch(e){ return null; } },
+  setItem(k,v){ try{ this._s().setItem(k,v); }catch(e){} },
+  removeItem(k){ try{ localStorage.removeItem(k); sessionStorage.removeItem(k); }catch(e){} }
+};
+const sbClient = window.supabase.createClient(SB_URL, SB_KEY, {
+  auth: { storage: authStorage, storageKey: 'tradelog-auth', persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+});
+
+let mfaFactorId = null;
+let started = false;
+const $a = id => document.getElementById(id);
+
+function authStep(id, title){
+  document.querySelectorAll('.auth-step').forEach(el => el.classList.toggle('active', el.id === id));
+  if(title) $a('authTitle').textContent = title;
+  const focus = { stepLogin:'authEmail', stepCode:'codeInput', stepEnroll:'enrollCode' }[id];
+  if(focus) setTimeout(() => $a(focus).focus(), 50);
+}
+function ruError(e){
+  const m = (e && (e.message || e.error_description)) || String(e);
+  if(/invalid login credentials/i.test(m)) return 'Неверный email или пароль.';
+  if(/invalid totp|invalid.*code|expired/i.test(m)) return 'Неверный или устаревший код. Подожди следующий и введи снова.';
+  if(/rate limit|too many/i.test(m)) return 'Слишком много попыток. Подожди несколько минут.';
+  if(/fetch|network/i.test(m)) return 'Нет связи с сервером. Проверь интернет.';
+  return m;
+}
+function decodeURIComponentSafe(v){ try{ return decodeURIComponent(v); }catch(e){ return v; } }
+function wipeLocal(){
+  ['trades','balance','book'].forEach(p => ls.del('tradelog-copy-' + p));
+  ls.del('tradelog-draft'); ls.del(REMEMBER_KEY); ls.del(REMEMBER_UNTIL);
+}
+
+async function enterJournal(){
+  const { data:{ session } } = await sbClient.auth.getSession();
+  SB_TOKEN = session ? session.access_token : null;
+  $a('authScreen').classList.add('hidden');
+  if(!started){ started = true; window.__startJournal(); window.__startBook(); }
+}
+
+// после пароля: нужен второй фактор
+async function secondFactor(){
+  const { data: aal, error } = await sbClient.auth.mfa.getAuthenticatorAssuranceLevel();
+  if(error) throw error;
+  if(aal.currentLevel === 'aal2') return enterJournal();
+  const { data: f, error: e2 } = await sbClient.auth.mfa.listFactors();
+  if(e2) throw e2;
+  const verified = (f.totp || []).filter(x => x.status === 'verified');
+  if(verified.length){
+    mfaFactorId = verified[0].id;
+    authStep('stepCode', 'Код подтверждения');
+    return;
+  }
+  // аутентификатор ещё не подключён — подключаем (старые незавершённые попытки удаляем)
+  for(const x of (f.all || []).filter(x => x.factor_type === 'totp' && x.status !== 'verified')){
+    await sbClient.auth.mfa.unenroll({ factorId: x.id });
+  }
+  const { data, error: e3 } = await sbClient.auth.mfa.enroll({ factorType:'totp', friendlyName:'TradeLog' });
+  if(e3) throw e3;
+  mfaFactorId = data.id;
+  // QR приходит как SVG: кодируем его, чтобы браузер точно его показал
+  const q = data.totp.qr_code || '';
+  const svg = q.startsWith('data:') ? decodeURIComponentSafe(q.slice(q.indexOf(',') + 1)) : q;
+  $a('enrollQr').src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  $a('enrollSecret').textContent = data.totp.secret;
+  authStep('stepEnroll', 'Двухфакторная защита');
+}
+
+async function verifyCode(inputId, errId, btnId){
+  const code = $a(inputId).value.replace(/\D/g, '');
+  if(code.length !== 6){ $a(errId).textContent = 'Код — 6 цифр.'; return; }
+  $a(btnId).disabled = true; $a(errId).textContent = '';
+  try{
+    const { error } = await sbClient.auth.mfa.challengeAndVerify({ factorId: mfaFactorId, code });
+    if(error) throw error;
+    await enterJournal();
+  }catch(e){
+    $a(errId).textContent = ruError(e);
+    $a(inputId).value = ''; $a(inputId).focus();
+  }finally{ $a(btnId).disabled = false; }
+}
+
+$a('loginBtn').addEventListener('click', async () => {
+  const email = $a('authEmail').value.trim(), password = $a('authPass').value;
+  if(!email || !password){ $a('loginErr').textContent = 'Введи email и пароль.'; return; }
+  $a('loginBtn').disabled = true; $a('loginErr').textContent = '';
+  // выбор хранилища сессии — до входа
+  if($a('authRemember').checked){
+    ls.set(REMEMBER_KEY, '1');
+    ls.set(REMEMBER_UNTIL, String(Date.now() + REMEMBER_DAYS * 864e5));
+  } else { ls.del(REMEMBER_KEY); ls.del(REMEMBER_UNTIL); }
+  try{
+    const { error } = await sbClient.auth.signInWithPassword({ email, password });
+    if(error) throw error;
+    $a('authPass').value = '';
+    await secondFactor();
+  }catch(e){ $a('loginErr').textContent = ruError(e); }
+  finally{ $a('loginBtn').disabled = false; }
+});
+$a('codeBtn').addEventListener('click', () => verifyCode('codeInput', 'codeErr', 'codeBtn'));
+$a('enrollBtn').addEventListener('click', () => verifyCode('enrollCode', 'enrollErr', 'enrollBtn'));
+['codeInput','enrollCode'].forEach(id => $a(id).addEventListener('input', e => {
+  e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+  if(e.target.value.length === 6) $a(id === 'codeInput' ? 'codeBtn' : 'enrollBtn').click();
+}));
+async function logout(){
+  wipeLocal();
+  try{ await sbClient.auth.signOut(); }catch(e){}
+  location.reload();
+}
+$a('codeBack').addEventListener('click', logout);
+$a('logoutBtn').addEventListener('click', () => { if(confirm('Выйти из журнала? На этом устройстве понадобится снова вводить пароль и код.')) logout(); });
+
+// обновление токена (Supabase продлевает его сам)
+sbClient.auth.onAuthStateChange((event, session) => {
+  SB_TOKEN = session ? session.access_token : null;
+  if(event === 'SIGNED_OUT' && started) location.reload();
+});
+
+// ---------- скрины: приватное хранилище, показываем по временным ссылкам ----------
+const PUB_PREFIX = `${SB_URL}/storage/v1/object/public/screenshots/`;
+const signedCache = new Map();
+async function signPath(path){
+  const c = signedCache.get(path);
+  if(c && c.exp > Date.now()) return c.url;
+  const { data, error } = await sbClient.storage.from('screenshots').createSignedUrl(path, 3600);
+  if(error) throw error;
+  signedCache.set(path, { url: data.signedUrl, exp: Date.now() + 50 * 60 * 1000 });
+  return data.signedUrl;
+}
+function fixImg(img){
+  const src = img.getAttribute('src') || '';
+  if(!src.startsWith(PUB_PREFIX)) return;
+  const path = decodeURIComponent(src.slice(PUB_PREFIX.length).split('?')[0]);
+  img.removeAttribute('src');
+  signPath(path).then(u => { img.src = u; }).catch(() => { img.alt = 'Скрин не загрузился'; });
+}
+new MutationObserver(muts => {
+  for(const m of muts){
+    if(m.type === 'attributes'){ if(m.target.tagName === 'IMG') fixImg(m.target); continue; }
+    m.addedNodes.forEach(n => {
+      if(n.nodeType !== 1) return;
+      if(n.tagName === 'IMG') fixImg(n);
+      if(n.querySelectorAll) n.querySelectorAll('img').forEach(fixImg);
+    });
+  }
+}).observe(document.body, { subtree:true, childList:true, attributes:true, attributeFilter:['src'] });
+
+// ---------- старт ----------
+(async () => {
+  authStep('stepLoading');
+  // срок «запомненного» устройства вышел — выходим
+  const until = parseInt(ls.get(REMEMBER_UNTIL) || '0', 10);
+  if(ls.get(REMEMBER_KEY) === '1' && until && until < Date.now()){
+    try{ await sbClient.auth.signOut({ scope:'local' }); }catch(e){}
+    wipeLocal();
+  }
+  try{
+    const { data:{ session } } = await sbClient.auth.getSession();
+    if(session){ SB_TOKEN = session.access_token; await secondFactor(); }
+    else authStep('stepLogin', 'Вход в журнал');
+  }catch(e){
+    authStep('stepLogin', 'Вход в журнал');
+    $a('loginErr').textContent = ruError(e);
+  }
+})();
 </script>
 </body>
 </html>
